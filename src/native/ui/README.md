@@ -34,10 +34,4 @@
 
 键名与 SDL2 一致，可查 [SDL_Keycode](https://wiki.libsdl.org/SDL2/SDLKeycodeLookup) / `SDL_GetKeyFromName`。
 
-## 示例
-
-- [`examples/breakout.js`](../../../examples/breakout.js) — 弹球打砖块（挡板 + 碰撞）
-- [`examples/snake.js`](../../../examples/snake.js) — 贪吃蛇（键盘）
-- [`examples/gomoku.js`](../../../examples/gomoku.js) — 双人五子棋（鼠标轮流落子）
-
 脚本参数需通过 **`argv()`** 读取（见 [`process` 模块说明](../process/README.md)）。
