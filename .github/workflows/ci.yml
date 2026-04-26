@@ -36,4 +36,4 @@ jobs:
       - name: UI module smoke (SDL dummy driver)
         env:
           SDL_VIDEODRIVER: dummy
-        run: ./build/bin/qianjs run examples/ui_demo.js 64
+        run: ./build/bin/qianjs run examples/breakout.js 128

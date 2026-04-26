@@ -103,7 +103,7 @@ qianjs embed dist/main.qbc        # 生成可独立运行的可执行文件副�
 说明：
 
 - 当 `QIANJS_MODULE_FS=OFF` 时，`qianjs` 不链接 `libuv/uvw`，`QIANJS_HAVE_LIBUV` 为假。
-- 当 `QIANJS_MODULE_UI=ON` 时，需已初始化子模块 **`third_party/sdl2`**（`git clone --recurse-submodules` 或 `git submodule update --init third_party/sdl2`）。不依赖系统 `libsdl2-dev` 等开发包。无头/CI 可设 `SDL_VIDEODRIVER=dummy`，并用 `qianjs run examples/ui_demo.js 120`、`qianjs run examples/snake.js 3000` 等形式传入正整数帧数上限以便脚本自动结束。
+- 当 `QIANJS_MODULE_UI=ON` 时，需已初始化子模块 **`third_party/sdl2`**（`git clone --recurse-submodules` 或 `git submodule update --init third_party/sdl2`）。不依赖系统 `libsdl2-dev` 等开发包。无头/CI 可设 `SDL_VIDEODRIVER=dummy`，并用 `qianjs run examples/breakout.js 2000`、`qianjs run examples/snake.js 3000`、`qianjs run examples/gomoku.js 5000` 等形式传入正整数帧数上限以便脚本自动结束。
 - 自动生成头文件在 `${CMAKE_BINARY_DIR}/generated/` 下：`qianjs_modules.h`、`qianjs_default_plugins.g.h`（请勿手改）。
 
 ---
@@ -151,7 +151,7 @@ ctest --test-dir build --output-on-failure
 
 模块 CMake 接线和目录规范：[`src/native/README.md`](src/native/README.md)。
 
-窗口与 2D 绘图示例：`examples/ui_demo.js`；贪吃蛇：`examples/snake.js`（均需构建时打开 `QIANJS_MODULE_UI`）。
+弹球打砖块：`examples/breakout.js`；贪吃蛇：`examples/snake.js`；双人五子棋：`examples/gomoku.js`（均需构建时打开 `QIANJS_MODULE_UI`）。
 
 ---
 
