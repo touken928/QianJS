@@ -4,7 +4,11 @@
 function(qianjs_native_register_module SUBDIR PLUGIN_CLASS HEADER_UNDER_SRC)
     string(TOUPPER "${SUBDIR}" _up)
     set(_opt "QIANJS_MODULE_${_up}")
-    option(${_opt} "QianJS native module (${SUBDIR})" ON)
+    set(_default ON)
+    if(ARGC GREATER 3)
+        set(_default "${ARGV3}")
+    endif()
+    option(${_opt} "QianJS native module (${SUBDIR})" ${_default})
     set_property(GLOBAL APPEND PROPERTY QIANJS_PLUGIN_SPECS "${_up}|${PLUGIN_CLASS}|${HEADER_UNDER_SRC}")
 endfunction()
 
@@ -50,3 +54,4 @@ qianjs_native_register_module(console ConsolePlugin native/console/console_modul
 qianjs_native_register_module(fs FsPlugin native/fs/fs_module.h)
 qianjs_native_register_module(process ProcessPlugin native/process/process_module.h)
 qianjs_native_register_module(timers TimersPlugin native/timers/timers_module.h)
+qianjs_native_register_module(ui UiPlugin native/ui/ui_module.h OFF)

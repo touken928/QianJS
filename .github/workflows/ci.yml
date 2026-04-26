@@ -25,10 +25,15 @@ jobs:
           sudo apt-get install -y --no-install-recommends build-essential cmake
 
       - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DQIANJS_BUILD_TESTS=ON
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DQIANJS_BUILD_TESTS=ON -DQIANJS_MODULE_UI=ON
 
       - name: Build
         run: cmake --build build -j "$(nproc)"
 
       - name: Unit tests (ctest)
         run: ctest --test-dir build --output-on-failure
+
+      - name: UI module smoke (SDL dummy driver)
+        env:
+          SDL_VIDEODRIVER: dummy
+        run: ./build/bin/qianjs run examples/ui_demo.js 64

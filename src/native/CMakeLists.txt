@@ -28,5 +28,11 @@ if(QIANJS_MODULE_TIMERS)
     )
 endif()
 
+if(QIANJS_MODULE_UI)
+    target_sources(qianjs_impl PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/ui/ui_module.cc
+    )
+endif()
+
 file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/generated")
 qianjs_write_native_glue("${CMAKE_BINARY_DIR}/generated")

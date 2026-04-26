@@ -73,6 +73,11 @@ if(QIANJS_BUILD_CLI)
         target_link_libraries(qianjs_impl PUBLIC qianjs::libuv qianjs::uvw)
     endif()
 
+    if(QIANJS_MODULE_UI)
+        include(cmake/ui.cmake)
+        target_link_libraries(qianjs_impl PRIVATE qianjs::ui_deps)
+    endif()
+
     # src/native/CMakeLists.txt: appends module sources, runs qianjs_write_native_glue (see src/native/native_modules.cmake).
     add_subdirectory(src/native)
 

@@ -8,7 +8,7 @@
 
 | 步骤 | 位置 |
 |------|------|
-| 声明 **`QIANJS_MODULE_<NAME>`**（默认 ON）、登记插件类与头文件路径 | **`src/native/native_modules.cmake`** 里 **`qianjs_native_register_module(<name> <PluginClass> native/<name>/<header>.h)`**（路径相对 **`src/`） |
+| 声明 **`QIANJS_MODULE_<NAME>`**、登记插件类与头文件路径 | **`src/native/native_modules.cmake`** 里 **`qianjs_native_register_module(<name> <PluginClass> native/<name>/<header>.h [默认 ON 或 OFF])`**（路径相对 **`src/`**；第四参数可选，为模块 **option** 默认值，省略时为 **`ON`**） |
 | 把 **`.cc`** 编进 **`qianjs`** | **`src/native/CMakeLists.txt`** 里 **`if(QIANJS_MODULE_<NAME>)` `target_sources(...)`** |
 
 ### 第三方库：仅在某模块开启时编译并链接
@@ -34,3 +34,4 @@
 - [fs](fs/README.md)
 - [process](process/README.md)
 - [timers](timers/README.md)
+- [ui](ui/README.md)（默认 **OFF**，子模块 **`third_party/sdl2`**）

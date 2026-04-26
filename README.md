@@ -98,10 +98,12 @@ qianjs embed dist/main.qbc        # 生成可独立运行的可执行文件副�
 | `QIANJS_MODULE_PROCESS` | `ON` | 启用 `process` |
 | `QIANJS_MODULE_TIMERS` | `ON` | 启用 `timers` |
 | `QIANJS_MODULE_FS` | `ON` | 启用 `fs` / `fs.sync` |
+| `QIANJS_MODULE_UI` | `OFF` | 启用 `ui`（**SDL2** 来自子模块 **`third_party/sdl2`**，静态链入） |
 
 说明：
 
 - 当 `QIANJS_MODULE_FS=OFF` 时，`qianjs` 不链接 `libuv/uvw`，`QIANJS_HAVE_LIBUV` 为假。
+- 当 `QIANJS_MODULE_UI=ON` 时，需已初始化子模块 **`third_party/sdl2`**（`git clone --recurse-submodules` 或 `git submodule update --init third_party/sdl2`）。不依赖系统 `libsdl2-dev` 等开发包。无头/CI 可设 `SDL_VIDEODRIVER=dummy`，并用 `qianjs run examples/ui_demo.js 120`、`qianjs run examples/snake.js 3000` 等形式传入正整数帧数上限以便脚本自动结束。
 - 自动生成头文件在 `${CMAKE_BINARY_DIR}/generated/` 下：`qianjs_modules.h`、`qianjs_default_plugins.g.h`（请勿手改）。
 
 ---
@@ -145,8 +147,11 @@ ctest --test-dir build --output-on-failure
 - [`process`](src/native/process/README.md)
 - [`timers`](src/native/timers/README.md)
 - [`fs`](src/native/fs/README.md)
+- [`ui`](src/native/ui/README.md)（可选模块，默认关闭）
 
 模块 CMake 接线和目录规范：[`src/native/README.md`](src/native/README.md)。
+
+窗口与 2D 绘图示例：`examples/ui_demo.js`；贪吃蛇：`examples/snake.js`（均需构建时打开 `QIANJS_MODULE_UI`）。
 
 ---
 
@@ -154,12 +159,13 @@ ctest --test-dir build --output-on-failure
 
 | 路径 | 说明 |
 |------|------|
-| `cmake/` | 第三方依赖封装（`qjs`、`libuv`、`uvw` 等） |
+| `cmake/` | 第三方依赖封装（`qjs`、`libuv`、`uvw`、`ui`→SDL2 等） |
 | `src/cli/` | CLI 入口 |
 | `src/runtime/` | 脚本宿主、事件循环、嵌入辅助 |
 | `src/native/` | 内置 native 模块与自动胶水生成 |
 | `tests/` | `qianjs_tests`（目录布局对齐 `src/`，见 [`tests/README.md`](tests/README.md)） |
 | `third_party/qjs` | qjs 子模块（封装与 QuickJS 拉取逻辑） |
+| `third_party/sdl2` | SDL2 源码子模块（仅 `QIANJS_MODULE_UI=ON` 时由 `cmake/ui.cmake` 编入） |
 
 更多构建策略见：[`cmake/README.md`](cmake/README.md)。
 
@@ -173,6 +179,7 @@ ctest --test-dir build --output-on-failure
 | qjs | 子模块 [touken928/qjs](https://github.com/touken928/qjs) |
 | libuv / uvw | 子模块 |
 | GoogleTest | CMake **FetchContent**，写在根 **`CMakeLists.txt`**（`QIANJS_BUILD_TESTS=ON` 时；首次 configure 需联网） |
+| SDL2 | 子模块 **`third_party/sdl2`**（[libsdl-org/SDL](https://github.com/libsdl-org/SDL)）；仅 **`QIANJS_MODULE_UI=ON`** 时由 **`cmake/ui.cmake`** `add_subdirectory` 静态编译 |
 
 ---
 
