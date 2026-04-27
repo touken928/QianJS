@@ -33,7 +33,7 @@ jobs:
           submodules: recursive
 
       - name: Configure
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DQIANJS_BUILD_TESTS=OFF
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DQIANJS_BUILD_TESTS=OFF -DQIANJS_MODULE_UI=ON
 
       - name: Build
         run: cmake --build build
