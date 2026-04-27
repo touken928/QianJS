@@ -22,7 +22,7 @@ struct RuntimeContext {
 inline std::vector<std::pair<std::string, std::string>> captureEnvironment() {
     std::vector<std::pair<std::string, std::string>> out;
 #if defined(_WIN32)
-    char** envp = ::_environ;
+    char** envp = _environ;
 #else
     char** envp = ::environ;
 #endif
