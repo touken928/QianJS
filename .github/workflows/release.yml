@@ -33,10 +33,10 @@ jobs:
           submodules: recursive
 
       - name: Configure
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DQIANJS_BUILD_TESTS=OFF -DQIANJS_MODULE_UI=ON
+        run: cmake --preset=prod -G Ninja
 
       - name: Build
-        run: cmake --build build
+        run: cmake --build --preset=prod
 
       - name: Rename artifact
         run: cp build/bin/qianjs.exe qianjs-${{ github.ref_name }}-windows-x86_64.exe

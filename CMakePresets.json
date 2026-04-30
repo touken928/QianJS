@@ -1,0 +1,101 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 16,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "common",
+      "hidden": true,
+      "description": "Shared settings across all presets",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true
+      }
+    },
+    {
+      "name": "debug",
+      "hidden": true,
+      "inherits": "common",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "QIANJS_BUILD_TESTS": true
+      }
+    },
+    {
+      "name": "release",
+      "hidden": true,
+      "inherits": "common",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "QIANJS_BUILD_TESTS": false
+      }
+    },
+    {
+      "name": "dev",
+      "description": "Default development preset (Debug + tests)",
+      "inherits": "debug",
+      "binaryDir": "${sourceDir}/build"
+    },
+    {
+      "name": "prod",
+      "description": "Production build (Release, no tests)",
+      "inherits": "release",
+      "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": {
+        "QIANJS_MODULE_UI": true
+      }
+    },
+    {
+      "name": "test",
+      "description": "Release build with tests enabled",
+      "inherits": "release",
+      "binaryDir": "${sourceDir}/build/test",
+      "cacheVariables": {
+        "QIANJS_BUILD_TESTS": true,
+        "QIANJS_MODULE_UI": true
+      },
+      "warnings": {
+        "dev": true,
+        "deprecated": true,
+        "uninitialized": true,
+        "unusedCli": false
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev",
+      "jobs": 0
+    },
+    {
+      "name": "prod",
+      "configurePreset": "prod",
+      "jobs": 0,
+      "targets": ["qianjs"]
+    },
+    {
+      "name": "test",
+      "configurePreset": "test",
+      "jobs": 0
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "test",
+      "configurePreset": "test",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

@@ -43,11 +43,11 @@ git submodule update --init --recursive
 ### 2) 构建
 
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j8
+cmake --preset=dev
+cmake --build --preset=dev
 ```
 
-默认可执行文件路径通常为 `build/bin/qianjs`（具体随生成器可能不同）。
+可执行文件路径为 `build/bin/qianjs`。
 
 ### 3) 运行示例
 
@@ -127,15 +127,13 @@ target_link_libraries(myapp PRIVATE qjs::qjs)
 
 ## 测试
 
-启用 **`QIANJS_BUILD_TESTS`**（默认开启）时通过 **FetchContent** 获取 GoogleTest；首次 **`cmake -B`** 需联网。
+启用 **`QIANJS_BUILD_TESTS`**（默认开启）时通过 **FetchContent** 获取 GoogleTest；首次 **`cmake --preset`** 需联网。
 
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Debug
-cmake --build build -j8
-ctest --test-dir build --output-on-failure
+cmake --preset=test
+cmake --build --preset=test
+ctest --preset=test --output-on-failure
 ```
-
-关闭测试可用：`-DQIANJS_BUILD_TESTS=OFF`。
 
 **CI**： [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 
