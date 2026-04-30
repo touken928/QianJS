@@ -25,13 +25,13 @@ jobs:
           sudo apt-get install -y --no-install-recommends build-essential cmake
 
       - name: Configure
-        run: cmake --preset=test
+        run: cmake --preset=dev
 
       - name: Build
-        run: cmake --build --preset=test -j "$(nproc)"
+        run: cmake --build --preset=dev -j "$(nproc)"
 
       - name: Unit tests (ctest)
-        run: ctest --preset=test --output-on-failure
+        run: ctest --preset=dev --output-on-failure
 
       - name: UI module smoke (SDL dummy driver)
         env:
