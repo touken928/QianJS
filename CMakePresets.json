@@ -36,6 +36,7 @@
       "name": "dev",
       "description": "Default development preset (Debug + tests)",
       "inherits": "debug",
+      "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "QIANJS_MODULE_UI": true
       }
@@ -53,6 +54,7 @@
       "name": "test",
       "description": "Release build with tests enabled",
       "inherits": "release",
+      "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "QIANJS_BUILD_TESTS": true,
         "QIANJS_MODULE_UI": true
