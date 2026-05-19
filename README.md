@@ -90,21 +90,29 @@ qianjs embed dist/main.qbc        # 生成可独立运行的可执行文件副�
 
 ## CMake 选项
 
-| 选项 | 默认 | 说明 |
-|------|------|------|
-| `QIANJS_BUILD_CLI` | `ON` | 构建 `qianjs` 可执行文件；开启时会纳入 `libuv/uvw` 相关配置 |
-| `QIANJS_BUILD_TESTS` | `ON` | 构建 `qianjs_tests` |
-| `QIANJS_MODULE_CONSOLE` | `ON` | 启用 `console` |
-| `QIANJS_MODULE_PROCESS` | `ON` | 启用 `process` |
-| `QIANJS_MODULE_TIMERS` | `ON` | 启用 `timers` |
-| `QIANJS_MODULE_FS` | `ON` | 启用 `fs` / `fs.sync` |
-| `QIANJS_MODULE_UI` | `OFF` | 启用 `ui`（**SDL2** 来自子模块 **`third_party/sdl2`**，静态链入） |
+| 选项 | 说明 |
+|------|------|
+| `QIANJS_BUILD_CLI` | 构建 `qianjs` 可执行文件 |
+| `QIANJS_BUILD_TESTS` | 构建 `qianjs_tests` |
+| `QIANJS_PROFILE` | 模块 SKU：`minimal` / `io` / `desktop`；空或 `custom` 时用下方 `QIANJS_MODULE_*` |
+| `QIANJS_MODULE_*` | 按模块覆盖（目录见 [`src/native/native_modules.cmake`](src/native/native_modules.cmake)） |
+
+**Profile 一览**
+
+| Profile | 包含模块 |
+|---------|----------|
+| `minimal` | console, process |
+| `io` | + timers, fs（链接 libuv） |
+| `desktop` | + ui, app（SDL2 子模块） |
+
+`cmake --preset=dev` 使用 `QIANJS_PROFILE=desktop`。另有 `minimal` / `io` preset 便于 SKU 构建。
 
 说明：
 
-- 当 `QIANJS_MODULE_FS=OFF` 时，`qianjs` 不链接 `libuv/uvw`，`QIANJS_HAVE_LIBUV` 为假。
-- 当 `QIANJS_MODULE_UI=ON` 时，需已初始化子模块 **`third_party/sdl2`**（`git clone --recurse-submodules` 或 `git submodule update --init third_party/sdl2`）。不依赖系统 `libsdl2-dev` 等开发包。无头/CI 可设 `SDL_VIDEODRIVER=dummy`，并用 `qianjs run examples/breakout.js 2000`、`qianjs run examples/snake.js 3000`、`qianjs run examples/gomoku.js 5000` 等形式传入正整数帧数上限以便脚本自动结束。
-- 自动生成头文件在 `${CMAKE_BINARY_DIR}/generated/` 下：`qianjs_modules.h`、`qianjs_default_plugins.g.h`（请勿手改）。
+- `fs` / `timers` 关闭时不会链接 `libuv/uvw`（`QIANJS_HAVE_LIBUV=0`）。
+- `desktop` 需子模块 **`third_party/sdl2`**。无头/CI：`SDL_VIDEODRIVER=dummy`，示例可传最大帧数如 `qianjs run examples/snake.js 64`。
+- 生成头文件：`build/generated/qianjs_modules.h`（含 `QIANJS_BUILD_PROFILE`、`QIANJS_BUILD_MODULES`）、`qianjs_default_plugins.g.h`。
+- `qianjs help` 打印当前构建的 profile 与模块列表。
 
 ---
 
@@ -158,8 +166,8 @@ ctest --preset=test --output-on-failure
 | 路径 | 说明 |
 |------|------|
 | `cmake/` | 第三方依赖封装（`qjs`、`libuv`、`uvw`、`ui`→SDL2 等） |
-| `src/cli/` | CLI 入口 |
-| `src/runtime/` | 脚本宿主、事件循环、嵌入辅助 |
+| `src/app/` | CLI（`main`、`cli`、子命令）与 `Application` 脚本宿主 |
+| `src/runtime/` | `RuntimeInstance`、调度器、帧循环、嵌入辅助 |
 | `src/native/` | 内置 native 模块与自动胶水生成 |
 | `tests/` | `qianjs_tests`（目录布局对齐 `src/`，见 [`tests/README.md`](tests/README.md)） |
 | `third_party/qjs` | qjs 子模块（封装与 QuickJS 拉取逻辑） |

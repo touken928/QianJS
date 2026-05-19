@@ -7,6 +7,7 @@
  * 规则：15×15 路、五连即胜；**黑先**。**鼠标左键**在交叉点附近落子；**R** 重开；**Esc** 或关窗退出。
  */
 import * as ui from 'ui';
+import { createApp, runApp } from 'app';
 import { argv as argvFn } from 'process';
 
 const SIZE = 15;
@@ -198,10 +199,26 @@ function draw() {
     }
 }
 
-reset();
-ui.init(W, H, '五子棋 — 黑先 | 鼠标左键落子 | R 重开 | 顶栏金框=行棋方');
-ui.runLoop((inp) => {
-    handleEvents(inp.events);
-    draw();
-}, cap);
-ui.close();
+const runOpts = {
+    width: W,
+    height: H,
+    title: '五子棋 — 黑先 | 鼠标左键落子 | R 重开 | 顶栏金框=行棋方',
+};
+if (cap > 0) {
+    runOpts.maxFrames = cap;
+}
+
+runApp(
+    createApp({
+        init() {
+            reset();
+        },
+        update(dt, input) {
+            handleEvents(input.events);
+        },
+        render() {
+            draw();
+        },
+    }),
+    runOpts
+);

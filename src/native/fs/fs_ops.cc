@@ -4,6 +4,7 @@
 #include "native/fs/fs_async_schedule.h"
 
 #include "runtime/event_loop/event_loop.h"
+#include "runtime/promise_track.h"
 
 #include <uvw.hpp>
 
@@ -17,6 +18,7 @@ namespace {
 
 using qianjs::fs::schedule::reject;
 using qianjs::fs::schedule::resolve_void;
+using qianjs::promise::release;
 
 void schedule_resolve_string_array(qjs::JSEngine::PromiseHandle ph, std::vector<std::string> names) {
     qianjs::event_loop::defer(
@@ -25,7 +27,7 @@ void schedule_resolve_string_array(qjs::JSEngine::PromiseHandle ph, std::vector<
             JSValue arr = JS_NewArray(c);
             if (JS_IsException(arr)) {
                 e.rejectPromise(ph, "failed to allocate array");
-                e.freePromise(ph);
+                release(e, ph);
                 return;
             }
             for (uint32_t i = 0; i < names.size(); i++) {
@@ -33,12 +35,12 @@ void schedule_resolve_string_array(qjs::JSEngine::PromiseHandle ph, std::vector<
                 if (JS_IsException(s) || JS_SetPropertyUint32(c, arr, i, s) < 0) {
                     JS_FreeValue(c, arr);
                     e.rejectPromise(ph, "failed to build readdir result");
-                    e.freePromise(ph);
+                    release(e, ph);
                     return;
                 }
             }
             e.resolvePromiseJSValue(ph, arr);
-            e.freePromise(ph);
+            release(e, ph);
         });
 }
 
@@ -48,18 +50,18 @@ void schedule_resolve_stat(qjs::JSEngine::PromiseHandle ph, const uv_stat_t& st)
         JSValue o = fs_stat_to_js(c, st);
         if (JS_IsException(o)) {
             e.rejectPromise(ph, "failed to build stat object");
-            e.freePromise(ph);
+            release(e, ph);
             return;
         }
         e.resolvePromiseJSValue(ph, o);
-        e.freePromise(ph);
+        release(e, ph);
     });
 }
 
 } // namespace
 
 qjs::RawJSValue fsReaddirAsync(qjs::JSEngine& engine, std::string path) {
-    qjs::JSEngine::PromiseHandle ph = engine.createPromise();
+    qjs::JSEngine::PromiseHandle ph = qianjs::promise::create(engine);
     if (!ph.ptr)
         return engine.promiseValue(ph);
 
@@ -113,7 +115,7 @@ qjs::RawJSValue fsReaddirAsync(qjs::JSEngine& engine, std::string path) {
 }
 
 qjs::RawJSValue fsStatAsync(qjs::JSEngine& engine, std::string path) {
-    qjs::JSEngine::PromiseHandle ph = engine.createPromise();
+    qjs::JSEngine::PromiseHandle ph = qianjs::promise::create(engine);
     if (!ph.ptr)
         return engine.promiseValue(ph);
 
@@ -150,7 +152,7 @@ qjs::RawJSValue fsStatAsync(qjs::JSEngine& engine, std::string path) {
 
 static qjs::RawJSValue fs_one_path_void(qjs::JSEngine& engine, std::string path,
     void (*start)(uvw::fs_req&, const std::string&), uvw::fs_req::fs_type doneType) {
-    qjs::JSEngine::PromiseHandle ph = engine.createPromise();
+    qjs::JSEngine::PromiseHandle ph = qianjs::promise::create(engine);
     if (!ph.ptr)
         return engine.promiseValue(ph);
 

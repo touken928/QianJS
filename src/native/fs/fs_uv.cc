@@ -3,6 +3,7 @@
 #include "native/fs/fs_async_schedule.h"
 
 #include "runtime/event_loop/event_loop.h"
+#include "runtime/promise_track.h"
 
 #include <uvw.hpp>
 
@@ -79,7 +80,7 @@ void write_done_fail(const std::shared_ptr<FsWriteCtx>& ctx, std::string msg) {
 } // namespace
 
 qjs::RawJSValue fsReadFileAsync(qjs::JSEngine& engine, std::string path, bool asBuffer) {
-    qjs::JSEngine::PromiseHandle ph = engine.createPromise();
+    qjs::JSEngine::PromiseHandle ph = qianjs::promise::create(engine);
     if (!ph.ptr)
         return engine.promiseValue(ph);
 
@@ -153,7 +154,7 @@ qjs::RawJSValue fsReadFileAsync(qjs::JSEngine& engine, std::string path, bool as
 
 static qjs::RawJSValue write_file_impl(qjs::JSEngine& engine, std::string path, std::vector<uint8_t> data, file_flags flags,
     int mode) {
-    qjs::JSEngine::PromiseHandle ph = engine.createPromise();
+    qjs::JSEngine::PromiseHandle ph = qianjs::promise::create(engine);
     if (!ph.ptr)
         return engine.promiseValue(ph);
 
@@ -213,7 +214,7 @@ qjs::RawJSValue fsWriteFileAsync(qjs::JSEngine& engine, std::string path, std::v
 }
 
 qjs::RawJSValue fsMkdirAsync(qjs::JSEngine& engine, std::string path, bool recursive) {
-    qjs::JSEngine::PromiseHandle ph = engine.createPromise();
+    qjs::JSEngine::PromiseHandle ph = qianjs::promise::create(engine);
     if (!ph.ptr)
         return engine.promiseValue(ph);
 

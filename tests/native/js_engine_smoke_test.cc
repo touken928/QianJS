@@ -6,5 +6,4 @@
 TEST(NativeJsEngineSmoke, InitializesAndCleansUp) {
     qjs::JSEngine engine;
     engine.initialize();
-    engine.cleanup();
 }

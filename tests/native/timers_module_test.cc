@@ -9,10 +9,8 @@
 #include <string>
 
 TEST(NativeTimersModule, SetTimeoutReturnsClearableId) {
-    qjs::JSEngine engine;
-    engine.initialize();
-    qianjs::RuntimeContext runtime;
-    qianjs::test::install_plugins(engine, runtime, {"prog"}, {});
+    qianjs::test::TestRuntime rt({"prog"}, {});
+    qjs::JSEngine& engine = rt.engine();
 
     const std::string js = R"(
 import { setTimeout, clearTimeout } from 'timers';
@@ -23,7 +21,7 @@ globalThis.__tid_cleared = 1;
 )";
 
     ASSERT_TRUE(qianjs::test::run_module(engine, "native_timers_id.mjs", js));
-    qianjs::drainAsyncWork(engine);
+    rt.drain();
 
     JSContext* c = engine.ctx();
     const std::string ty = qianjs::test::global_string(c, "__tid_type");
@@ -33,14 +31,11 @@ globalThis.__tid_cleared = 1;
     EXPECT_TRUE(ok);
     EXPECT_EQ(qianjs::test::global_string(c, "__tid_hit"), "");
 
-    engine.cleanup();
 }
 
 TEST(NativeTimersModule, SetTimeoutFires) {
-    qjs::JSEngine engine;
-    engine.initialize();
-    qianjs::RuntimeContext runtime;
-    qianjs::test::install_plugins(engine, runtime, {"prog"}, {});
+    qianjs::test::TestRuntime rt({"prog"}, {});
+    qjs::JSEngine& engine = rt.engine();
 
     const std::string js = R"(
 import { setTimeout } from 'timers';
@@ -48,7 +43,7 @@ setTimeout(() => { globalThis.__timer_ok = 1; }, 5);
 )";
 
     ASSERT_TRUE(qianjs::test::run_module(engine, "native_timers_timeout.mjs", js));
-    qianjs::drainAsyncWork(engine);
+    rt.drain();
 
     JSContext* c = engine.ctx();
     bool ok = false;
@@ -56,14 +51,11 @@ setTimeout(() => { globalThis.__timer_ok = 1; }, 5);
     EXPECT_TRUE(ok);
     EXPECT_EQ(n, 1);
 
-    engine.cleanup();
 }
 
 TEST(NativeTimersModule, SetTimeoutZeroDelay) {
-    qjs::JSEngine engine;
-    engine.initialize();
-    qianjs::RuntimeContext runtime;
-    qianjs::test::install_plugins(engine, runtime, {"prog"}, {});
+    qianjs::test::TestRuntime rt({"prog"}, {});
+    qjs::JSEngine& engine = rt.engine();
 
     const std::string js = R"(
 import { setTimeout } from 'timers';
@@ -71,21 +63,18 @@ setTimeout(() => { globalThis.__z = 1; }, 0);
 )";
 
     ASSERT_TRUE(qianjs::test::run_module(engine, "native_timers_zero.mjs", js));
-    qianjs::drainAsyncWork(engine);
+    rt.drain();
 
     JSContext* c = engine.ctx();
     bool ok = false;
     EXPECT_EQ(qianjs::test::global_int(c, "__z", &ok), 1);
     EXPECT_TRUE(ok);
 
-    engine.cleanup();
 }
 
 TEST(NativeTimersModule, SetIntervalThenClearInterval) {
-    qjs::JSEngine engine;
-    engine.initialize();
-    qianjs::RuntimeContext runtime;
-    qianjs::test::install_plugins(engine, runtime, {"prog"}, {});
+    qianjs::test::TestRuntime rt({"prog"}, {});
+    qjs::JSEngine& engine = rt.engine();
 
     const std::string js = R"(
 import { setInterval, clearInterval } from 'timers';
@@ -98,7 +87,7 @@ const id = setInterval(() => {
 )";
 
     ASSERT_TRUE(qianjs::test::run_module(engine, "native_timers_interval.mjs", js));
-    qianjs::drainAsyncWork(engine);
+    rt.drain();
 
     JSContext* c = engine.ctx();
     bool ok = false;
@@ -106,14 +95,11 @@ const id = setInterval(() => {
     EXPECT_TRUE(ok);
     EXPECT_GE(n, 3);
 
-    engine.cleanup();
 }
 
 TEST(NativeTimersModule, ClearTimeoutBeforeFire) {
-    qjs::JSEngine engine;
-    engine.initialize();
-    qianjs::RuntimeContext runtime;
-    qianjs::test::install_plugins(engine, runtime, {"prog"}, {});
+    qianjs::test::TestRuntime rt({"prog"}, {});
+    qjs::JSEngine& engine = rt.engine();
 
     const std::string js = R"(
 import { setTimeout, clearTimeout } from 'timers';
@@ -123,7 +109,7 @@ globalThis.__cleared_ok = 1;
 )";
 
     ASSERT_TRUE(qianjs::test::run_module(engine, "native_timers_clear.mjs", js));
-    qianjs::drainAsyncWork(engine);
+    rt.drain();
 
     JSContext* c = engine.ctx();
     bool ok = false;
@@ -131,14 +117,11 @@ globalThis.__cleared_ok = 1;
     EXPECT_TRUE(ok);
     EXPECT_EQ(qianjs::test::global_string(c, "__long"), "");
 
-    engine.cleanup();
 }
 
 TEST(NativeTimersModule, ClearTimeoutUnknownIdNoOp) {
-    qjs::JSEngine engine;
-    engine.initialize();
-    qianjs::RuntimeContext runtime;
-    qianjs::test::install_plugins(engine, runtime, {"prog"}, {});
+    qianjs::test::TestRuntime rt({"prog"}, {});
+    qjs::JSEngine& engine = rt.engine();
 
     const std::string js = R"(
 import { clearTimeout } from 'timers';
@@ -147,21 +130,18 @@ globalThis.__noop_clear = 1;
 )";
 
     ASSERT_TRUE(qianjs::test::run_module(engine, "native_timers_clear_unknown.mjs", js));
-    qianjs::drainAsyncWork(engine);
+    rt.drain();
 
     JSContext* c = engine.ctx();
     bool ok = false;
     EXPECT_EQ(qianjs::test::global_int(c, "__noop_clear", &ok), 1);
     EXPECT_TRUE(ok);
 
-    engine.cleanup();
 }
 
 TEST(NativeTimersModule, ClearIntervalAliasClearsTimer) {
-    qjs::JSEngine engine;
-    engine.initialize();
-    qianjs::RuntimeContext runtime;
-    qianjs::test::install_plugins(engine, runtime, {"prog"}, {});
+    qianjs::test::TestRuntime rt({"prog"}, {});
+    qjs::JSEngine& engine = rt.engine();
 
     const std::string js = R"(
 import { setTimeout, clearInterval } from 'timers';
@@ -171,21 +151,18 @@ globalThis.__ci_cleared = 1;
 )";
 
     ASSERT_TRUE(qianjs::test::run_module(engine, "native_timers_clear_interval_alias.mjs", js));
-    qianjs::drainAsyncWork(engine);
+    rt.drain();
 
     JSContext* c = engine.ctx();
     bool ok = false;
     EXPECT_EQ(qianjs::test::global_int(c, "__ci_cleared", &ok), 1);
     EXPECT_TRUE(ok);
 
-    engine.cleanup();
 }
 
 TEST(NativeTimersModule, SetTimeoutNonFunctionThrowsTypeError) {
-    qjs::JSEngine engine;
-    engine.initialize();
-    qianjs::RuntimeContext runtime;
-    qianjs::test::install_plugins(engine, runtime, {"prog"}, {});
+    qianjs::test::TestRuntime rt({"prog"}, {});
+    qjs::JSEngine& engine = rt.engine();
 
     const std::string js = R"(
 import { setTimeout } from 'timers';
@@ -198,20 +175,17 @@ try {
 )";
 
     ASSERT_TRUE(qianjs::test::run_module(engine, "native_timers_bad_cb.mjs", js));
-    qianjs::drainAsyncWork(engine);
+    rt.drain();
 
     JSContext* c = engine.ctx();
     const std::string msg = qianjs::test::global_string(c, "__bad_to");
     EXPECT_NE(msg.find("callback must be function"), std::string::npos);
 
-    engine.cleanup();
 }
 
 TEST(NativeTimersModule, SetIntervalNonFunctionThrowsTypeError) {
-    qjs::JSEngine engine;
-    engine.initialize();
-    qianjs::RuntimeContext runtime;
-    qianjs::test::install_plugins(engine, runtime, {"prog"}, {});
+    qianjs::test::TestRuntime rt({"prog"}, {});
+    qjs::JSEngine& engine = rt.engine();
 
     const std::string js = R"(
 import { setInterval } from 'timers';
@@ -224,13 +198,12 @@ try {
 )";
 
     ASSERT_TRUE(qianjs::test::run_module(engine, "native_timers_bad_interval.mjs", js));
-    qianjs::drainAsyncWork(engine);
+    rt.drain();
 
     JSContext* c = engine.ctx();
     const std::string msg = qianjs::test::global_string(c, "__bad_iv");
     EXPECT_NE(msg.find("callback must be function"), std::string::npos);
 
-    engine.cleanup();
 }
 
 #endif // QIANJS_MODULE_TIMERS

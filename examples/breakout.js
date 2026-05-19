@@ -7,6 +7,7 @@
  * **鼠标** 或 **A/D**、**左右方向键** 移动挡板；**R** 重开；清完砖块或球落底后按 **R**；**Esc** 或关窗退出。
  */
 import * as ui from 'ui';
+import { createApp, runApp } from 'app';
 import { argv as argvFn } from 'process';
 
 const W = 480;
@@ -37,8 +38,6 @@ let paddleX;
 let score;
 /** 'play' | 'lost' | 'won' */
 let phase;
-let lastMs;
-
 function reset() {
     bricks = [];
     for (let row = 0; row < BRICK_ROWS; row++) {
@@ -53,7 +52,6 @@ function reset() {
     ball = { x: W / 2, y: PADDLE_Y - BALL_R - 8, vx: 220, vy: -260 };
     score = 0;
     phase = 'play';
-    lastMs = Date.now();
 }
 
 function aliveCount() {
@@ -239,16 +237,29 @@ function draw() {
     }
 }
 
-reset();
-ui.init(W, H, '打砖块 — 鼠标/A/D 挡板 | R 重开 | 清砖胜利');
-ui.runLoop((inp) => {
-    const now = Date.now();
-    const dt = Math.min(0.05, Math.max(0, (now - lastMs) / 1000));
-    lastMs = now;
+const runOpts = {
+    width: W,
+    height: H,
+    title: '打砖块 — 鼠标/A/D 挡板 | R 重开 | 清砖胜利',
+};
+if (cap > 0) {
+    runOpts.maxFrames = cap;
+}
 
-    handleEvents(inp.events);
-    syncPaddle();
-    step(dt);
-    draw();
-}, cap);
-ui.close();
+runApp(
+    createApp({
+        init() {
+            reset();
+        },
+        update(dt, input) {
+            const stepDt = Math.min(0.05, Math.max(0, dt));
+            handleEvents(input.events);
+            syncPaddle();
+            step(stepDt);
+        },
+        render() {
+            draw();
+        },
+    }),
+    runOpts
+);

@@ -13,16 +13,17 @@
 | `getMouseState()` | 当前鼠标相对**焦点窗口**的坐标与按键：`{ x, y, buttons: { left, middle, right, x1, x2 } }` |
 | `getModState()` | 修饰键：`{ shift, ctrl, alt, gui, num, caps, lshift, rshift, …, raw }`（`raw` 为 SDL 位掩码） |
 | `isKeyDown(nameOrSym)` | 参数为 **`SDL_GetKeyFromName`** 所用字符串（如 `"Space"`、`"Left"`）或 **SDLK_** 整型键码；当前帧键盘状态是否为按下 |
-| `present()` | `SDL_RenderPresent`（一帧绘制结束后提交） |
+| `present()` | 立即执行当前 **DrawList** 并 `SDL_RenderPresent`（`runApp` 会在每帧 `render()` 后自动 present） |
 | `setSourceRGBA(r, g, b, a)` | 当前笔触/填充颜色（分量 0–1） |
 | `clear(r, g, b, a)` | 以实色清空整窗（不改变 `setSourceRGBA` 所存笔触色） |
 | `fillRect(x, y, w, h)` | 填充矩形 |
 | `strokeRect(x, y, w, h)` | 描边矩形 |
 | `setLineWidth(w)` | 线宽（`stroke` / `strokeRect` 近似） |
 | `moveTo(x, y)` / `lineTo(x, y)` / `stroke()` | 折线描边 |
-| `runLoop(frameCallback, maxFrames?)` | 每帧以**一个参数**调用：`{ frame, events }`（`events` 与 `readEvents` 格式相同），然后 `present`；仍会在 **QUIT / Esc** 时结束。若 `maxFrames` 为正整数则跑满帧数退出 |
 
-### `readEvents` / `runLoop` 中 `events[]` 元素
+游戏循环请使用 **`app.runApp(createApp({ update, render }))`**。无窗口 headless：`QIANJS_NULL_UI=1`（见根目录 **`AGENTS.md`**）。
+
+### `readEvents` / `runApp` 的 `input.events` 元素
 
 | `type` | 主要字段 |
 |--------|----------|

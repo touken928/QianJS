@@ -13,7 +13,7 @@ import * as process from 'process';
 ### `argv()`
 
 - 返回：`string[]`，脚本参数数组。
-- `qianjs run app.js a b` 时，返回 `["app.js", "a", "b"]`（与 `script_host` 注入的 `RuntimeContext` 一致）。
+- `qianjs run app.js a b` 时，返回 `["app.js", "a", "b"]`（由 **`Application::run_script`** 写入 **`RuntimeInstance::host().argv`**）。
 
 ### `env()`
 

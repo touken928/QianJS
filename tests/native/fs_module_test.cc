@@ -41,10 +41,8 @@ TEST(NativeFsModule, AsyncReadFileAndReadFileBytes) {
         std::fclose(f);
     }
 
-    qjs::JSEngine engine;
-    engine.initialize();
-    qianjs::RuntimeContext runtime;
-    qianjs::test::install_plugins(engine, runtime, {"prog"}, {});
+    qianjs::test::TestRuntime rt({"prog"}, {});
+    qjs::JSEngine& engine = rt.engine();
 
     const std::string p = qianjs::test::js_string_literal(file.string());
     const std::string js = "import { readFileBytes, unlink } from 'fs';\nconst p = " + p
@@ -57,7 +55,7 @@ TEST(NativeFsModule, AsyncReadFileAndReadFileBytes) {
           "}).then(() => { globalThis.__rf_bytes_done = 1; });\n";
 
     ASSERT_TRUE(qianjs::test::run_module(engine, "native_fs_async_bytes.mjs", js));
-    qianjs::drainAsyncWork(engine);
+    rt.drain();
 
     JSContext* c = engine.ctx();
     bool ok = false;
@@ -70,7 +68,6 @@ TEST(NativeFsModule, AsyncReadFileAndReadFileBytes) {
     EXPECT_EQ(qianjs::test::global_int(c, "__b2", &ok), 128);
     EXPECT_TRUE(ok);
 
-    engine.cleanup();
     cleanup(root);
 }
 
@@ -80,10 +77,8 @@ TEST(NativeFsModule, AsyncWriteFileStringUnicodeAndReadBack) {
     fs::create_directories(root, ec);
     ASSERT_FALSE(ec) << ec.message();
 
-    qjs::JSEngine engine;
-    engine.initialize();
-    qianjs::RuntimeContext runtime;
-    qianjs::test::install_plugins(engine, runtime, {"prog"}, {});
+    qianjs::test::TestRuntime rt({"prog"}, {});
+    qjs::JSEngine& engine = rt.engine();
 
     const std::string p = qianjs::test::js_string_literal((root / "u.txt").string());
     const std::string js =
@@ -94,7 +89,7 @@ TEST(NativeFsModule, AsyncWriteFileStringUnicodeAndReadBack) {
         "}).then(() => { globalThis.__utf_done = 1; });\n";
 
     ASSERT_TRUE(qianjs::test::run_module(engine, "native_fs_utf8.mjs", js));
-    qianjs::drainAsyncWork(engine);
+    rt.drain();
 
     JSContext* c = engine.ctx();
     const std::string want = u8"\u4f60\u597d";
@@ -103,7 +98,6 @@ TEST(NativeFsModule, AsyncWriteFileStringUnicodeAndReadBack) {
     EXPECT_EQ(qianjs::test::global_int(c, "__utf_done", &ok), 1);
     EXPECT_TRUE(ok);
 
-    engine.cleanup();
     cleanup(root);
 }
 
@@ -113,10 +107,8 @@ TEST(NativeFsModule, AsyncWriteFileUint8Array) {
     fs::create_directories(root, ec);
     ASSERT_FALSE(ec) << ec.message();
 
-    qjs::JSEngine engine;
-    engine.initialize();
-    qianjs::RuntimeContext runtime;
-    qianjs::test::install_plugins(engine, runtime, {"prog"}, {});
+    qianjs::test::TestRuntime rt({"prog"}, {});
+    qjs::JSEngine& engine = rt.engine();
 
     const std::string p = qianjs::test::js_string_literal((root / "raw.bin").string());
     const std::string js = "import { writeFile, readFileBytes, unlink } from 'fs';\nconst p = " + p + ";\n"
@@ -130,7 +122,7 @@ TEST(NativeFsModule, AsyncWriteFileUint8Array) {
                            "  .then(() => { globalThis.__u8_done = 1; });\n";
 
     ASSERT_TRUE(qianjs::test::run_module(engine, "native_fs_u8.mjs", js));
-    qianjs::drainAsyncWork(engine);
+    rt.drain();
 
     JSContext* c = engine.ctx();
     bool ok = false;
@@ -139,7 +131,6 @@ TEST(NativeFsModule, AsyncWriteFileUint8Array) {
     EXPECT_EQ(qianjs::test::global_int(c, "__u8_done", &ok), 1);
     EXPECT_TRUE(ok);
 
-    engine.cleanup();
     cleanup(root);
 }
 
@@ -149,10 +140,8 @@ TEST(NativeFsModule, AsyncMkdirReaddirStatUnlinkRmdir) {
     fs::create_directories(root, ec);
     ASSERT_FALSE(ec) << ec.message();
 
-    qjs::JSEngine engine;
-    engine.initialize();
-    qianjs::RuntimeContext runtime;
-    qianjs::test::install_plugins(engine, runtime, {"prog"}, {});
+    qianjs::test::TestRuntime rt({"prog"}, {});
+    qjs::JSEngine& engine = rt.engine();
 
     const std::string b = qianjs::test::js_string_literal(root.string());
     const std::string js =
@@ -178,7 +167,7 @@ TEST(NativeFsModule, AsyncMkdirReaddirStatUnlinkRmdir) {
         "  .then(() => { globalThis.__tree_done = 1; });\n";
 
     ASSERT_TRUE(qianjs::test::run_module(engine, "native_fs_tree.mjs", js));
-    qianjs::drainAsyncWork(engine);
+    rt.drain();
 
     JSContext* c = engine.ctx();
     EXPECT_EQ(qianjs::test::global_string(c, "__rd"), R"(["a.txt","b.txt"])");
@@ -190,7 +179,6 @@ TEST(NativeFsModule, AsyncMkdirReaddirStatUnlinkRmdir) {
     EXPECT_EQ(qianjs::test::global_int(c, "__tree_done", &ok), 1);
     EXPECT_TRUE(ok);
 
-    engine.cleanup();
     cleanup(root);
 }
 
@@ -200,10 +188,8 @@ TEST(NativeFsModule, AsyncMkdirRecursive) {
     fs::create_directories(root, ec);
     ASSERT_FALSE(ec) << ec.message();
 
-    qjs::JSEngine engine;
-    engine.initialize();
-    qianjs::RuntimeContext runtime;
-    qianjs::test::install_plugins(engine, runtime, {"prog"}, {});
+    qianjs::test::TestRuntime rt({"prog"}, {});
+    qjs::JSEngine& engine = rt.engine();
 
     const std::string b = qianjs::test::js_string_literal(root.string());
     const std::string js = "import { mkdirRecursive, stat, rmdir } from 'fs';\nconst base = " + b + ";\n"
@@ -218,7 +204,7 @@ TEST(NativeFsModule, AsyncMkdirRecursive) {
                            "  .then(() => { globalThis.__mkrec_done = 1; });\n";
 
     ASSERT_TRUE(qianjs::test::run_module(engine, "native_fs_mkrec.mjs", js));
-    qianjs::drainAsyncWork(engine);
+    rt.drain();
 
     JSContext* c = engine.ctx();
     bool ok = false;
@@ -227,7 +213,6 @@ TEST(NativeFsModule, AsyncMkdirRecursive) {
     EXPECT_EQ(qianjs::test::global_int(c, "__mkrec_done", &ok), 1);
     EXPECT_TRUE(ok);
 
-    engine.cleanup();
     cleanup(root);
 }
 
@@ -237,10 +222,8 @@ TEST(NativeFsModule, AsyncWriteFileInvalidDataRejects) {
     fs::create_directories(root, ec);
     ASSERT_FALSE(ec) << ec.message();
 
-    qjs::JSEngine engine;
-    engine.initialize();
-    qianjs::RuntimeContext runtime;
-    qianjs::test::install_plugins(engine, runtime, {"prog"}, {});
+    qianjs::test::TestRuntime rt({"prog"}, {});
+    qjs::JSEngine& engine = rt.engine();
 
     const std::string p = qianjs::test::js_string_literal((root / "x.bin").string());
     const std::string js = "import { writeFile } from 'fs';\nconst p = " + p + ";\n"
@@ -252,12 +235,11 @@ TEST(NativeFsModule, AsyncWriteFileInvalidDataRejects) {
                            "}\n";
 
     ASSERT_TRUE(qianjs::test::run_module(engine, "native_fs_badwf.mjs", js));
-    qianjs::drainAsyncWork(engine);
+    rt.drain();
 
     JSContext* c = engine.ctx();
     EXPECT_NE(qianjs::test::global_string(c, "__wf_bad").find("writeFile"), std::string::npos);
 
-    engine.cleanup();
     cleanup(root);
 }
 
@@ -267,22 +249,19 @@ TEST(NativeFsModule, AsyncReadMissingRejects) {
     fs::create_directories(root, ec);
     ASSERT_FALSE(ec) << ec.message();
 
-    qjs::JSEngine engine;
-    engine.initialize();
-    qianjs::RuntimeContext runtime;
-    qianjs::test::install_plugins(engine, runtime, {"prog"}, {});
+    qianjs::test::TestRuntime rt({"prog"}, {});
+    qjs::JSEngine& engine = rt.engine();
 
     const std::string p = qianjs::test::js_string_literal((root / "nope_not_here.txt").string());
     const std::string js = "import { readFile } from 'fs';\nconst p = " + p + ";\n"
                            "readFile(p).catch((e) => { globalThis.__rej = String(e); });\n";
 
     ASSERT_TRUE(qianjs::test::run_module(engine, "native_fs_rej.mjs", js));
-    qianjs::drainAsyncWork(engine);
+    rt.drain();
 
     JSContext* c = engine.ctx();
     EXPECT_NE(qianjs::test::global_string(c, "__rej"), "");
 
-    engine.cleanup();
     cleanup(root);
 }
 
@@ -292,10 +271,8 @@ TEST(NativeFsModule, SyncReadWriteMkdirReaddirStatUnlinkRmdir) {
     fs::create_directories(root, ec);
     ASSERT_FALSE(ec) << ec.message();
 
-    qjs::JSEngine engine;
-    engine.initialize();
-    qianjs::RuntimeContext runtime;
-    qianjs::test::install_plugins(engine, runtime, {"prog"}, {});
+    qianjs::test::TestRuntime rt({"prog"}, {});
+    qjs::JSEngine& engine = rt.engine();
 
     const std::string b = qianjs::test::js_string_literal(root.string());
     const std::string js =
@@ -320,7 +297,7 @@ TEST(NativeFsModule, SyncReadWriteMkdirReaddirStatUnlinkRmdir) {
         "globalThis.__sync_ok = 1;\n";
 
     ASSERT_TRUE(qianjs::test::run_module(engine, "native_fs_sync.mjs", js));
-    qianjs::drainAsyncWork(engine);
+    rt.drain();
 
     JSContext* c = engine.ctx();
     EXPECT_EQ(qianjs::test::global_string(c, "__sr"), "sync");
@@ -332,7 +309,6 @@ TEST(NativeFsModule, SyncReadWriteMkdirReaddirStatUnlinkRmdir) {
     EXPECT_EQ(qianjs::test::global_int(c, "__sync_ok", &ok), 1);
     EXPECT_TRUE(ok);
 
-    engine.cleanup();
     cleanup(root);
 }
 
@@ -342,10 +318,8 @@ TEST(NativeFsModule, SyncStatDirectoryShape) {
     fs::create_directories(root / "sub", ec);
     ASSERT_FALSE(ec) << ec.message();
 
-    qjs::JSEngine engine;
-    engine.initialize();
-    qianjs::RuntimeContext runtime;
-    qianjs::test::install_plugins(engine, runtime, {"prog"}, {});
+    qianjs::test::TestRuntime rt({"prog"}, {});
+    qjs::JSEngine& engine = rt.engine();
 
     const std::string d = qianjs::test::js_string_literal((root / "sub").string());
     const std::string js = "import { sync as fss } from 'fs';\nconst d = " + d + ";\n"
@@ -354,14 +328,13 @@ TEST(NativeFsModule, SyncStatDirectoryShape) {
                            "isSymbolicLink: st.isSymbolicLink });\n";
 
     ASSERT_TRUE(qianjs::test::run_module(engine, "native_fs_stdir.mjs", js));
-    qianjs::drainAsyncWork(engine);
+    rt.drain();
 
     JSContext* c = engine.ctx();
     const std::string s = qianjs::test::global_string(c, "__stdir");
     EXPECT_NE(s.find("\"isFile\":false"), std::string::npos);
     EXPECT_NE(s.find("\"isDirectory\":true"), std::string::npos);
 
-    engine.cleanup();
     cleanup(root);
 }
 
@@ -377,10 +350,8 @@ TEST(NativeFsModule, SyncRmdirNonemptyThrows) {
         std::fclose(f);
     }
 
-    qjs::JSEngine engine;
-    engine.initialize();
-    qianjs::RuntimeContext runtime;
-    qianjs::test::install_plugins(engine, runtime, {"prog"}, {});
+    qianjs::test::TestRuntime rt({"prog"}, {});
+    qjs::JSEngine& engine = rt.engine();
 
     const std::string d = qianjs::test::js_string_literal((root / "k").string());
     const std::string js = "import { sync as fss } from 'fs';\nconst d = " + d + ";\n"
@@ -388,12 +359,11 @@ TEST(NativeFsModule, SyncRmdirNonemptyThrows) {
                            "catch (e) { globalThis.__rmdir_ne = String(e); }\n";
 
     ASSERT_TRUE(qianjs::test::run_module(engine, "native_fs_rmfull.mjs", js));
-    qianjs::drainAsyncWork(engine);
+    rt.drain();
 
     JSContext* c = engine.ctx();
     EXPECT_NE(qianjs::test::global_string(c, "__rmdir_ne").find("rmdir"), std::string::npos);
 
-    engine.cleanup();
     cleanup(root);
 }
 
@@ -403,10 +373,8 @@ TEST(NativeFsModule, SyncReadMissingThrows) {
     fs::create_directories(root, ec);
     ASSERT_FALSE(ec) << ec.message();
 
-    qjs::JSEngine engine;
-    engine.initialize();
-    qianjs::RuntimeContext runtime;
-    qianjs::test::install_plugins(engine, runtime, {"prog"}, {});
+    qianjs::test::TestRuntime rt({"prog"}, {});
+    qjs::JSEngine& engine = rt.engine();
 
     const std::string p = qianjs::test::js_string_literal((root / "missing.txt").string());
     const std::string js = "import { sync as fss } from 'fs';\nconst p = " + p + ";\n"
@@ -414,12 +382,11 @@ TEST(NativeFsModule, SyncReadMissingThrows) {
                            "catch (e) { globalThis.__sync_miss = String(e); }\n";
 
     ASSERT_TRUE(qianjs::test::run_module(engine, "native_fs_sync_miss.mjs", js));
-    qianjs::drainAsyncWork(engine);
+    rt.drain();
 
     JSContext* c = engine.ctx();
     EXPECT_NE(qianjs::test::global_string(c, "__sync_miss").find("readFile"), std::string::npos);
 
-    engine.cleanup();
     cleanup(root);
 }
 

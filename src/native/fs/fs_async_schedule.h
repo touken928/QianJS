@@ -1,6 +1,7 @@
 #pragma once
 
 #include "runtime/event_loop/event_loop.h"
+#include "runtime/promise_track.h"
 
 #include <js_engine.h>
 
@@ -16,14 +17,14 @@ inline void reject(qjs::JSEngine::PromiseHandle ph, std::string msg, const std::
                 e.rejectPromise(ph, msg);
             else
                 e.rejectPromise(ph, msg, code);
-            e.freePromise(ph);
+            promise::release(e, ph);
         });
 }
 
 inline void resolve_void(qjs::JSEngine::PromiseHandle ph) {
     qianjs::event_loop::defer([ph](qjs::JSEngine& e) {
         e.resolvePromiseVoid(ph);
-        e.freePromise(ph);
+        promise::release(e, ph);
     });
 }
 
@@ -31,7 +32,7 @@ inline void resolve_string(qjs::JSEngine::PromiseHandle ph, std::string data) {
     qianjs::event_loop::defer(
         [ph, data = std::move(data)](qjs::JSEngine& e) {
             e.resolvePromise(ph, data);
-            e.freePromise(ph);
+            promise::release(e, ph);
         });
 }
 
@@ -40,7 +41,7 @@ inline void resolve_bytes(qjs::JSEngine::PromiseHandle ph, std::string buffer) {
         [ph, buf = std::move(buffer)](qjs::JSEngine& e) {
             const uint8_t* p = reinterpret_cast<const uint8_t*>(buf.data());
             e.resolvePromiseBytes(ph, p, buf.size());
-            e.freePromise(ph);
+            promise::release(e, ph);
         });
 }
 

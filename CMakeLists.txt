@@ -52,8 +52,17 @@ if(QIANJS_BUILD_CLI)
     find_package(Threads REQUIRED)
 
     add_library(qianjs_impl STATIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/cli/cli_runner.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/app/application.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/app/cli.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/app/cli_usage.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/app/commands/build_command.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/app/commands/embed_command.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/app/commands/run_command.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/event_loop/event_loop.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/plugin_lifecycle.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/promise_registry.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/scheduler.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/instance.cc
     )
 
     target_include_directories(qianjs_impl PUBLIC
@@ -61,28 +70,27 @@ if(QIANJS_BUILD_CLI)
         ${CMAKE_CURRENT_BINARY_DIR}/generated
     )
 
-    target_compile_definitions(qianjs_impl PUBLIC
-        "QIANJS_HAVE_LIBUV=$<BOOL:${QIANJS_MODULE_FS}>"
-    )
-
     target_link_libraries(qianjs_impl PUBLIC
         qjs::qjs
         Threads::Threads
     )
-    if(QIANJS_MODULE_FS)
+
+    # Native catalog, generated glue, platform/ui stack (see src/native/native_modules.cmake).
+    add_subdirectory(src/native)
+
+    target_compile_definitions(qianjs_impl PUBLIC
+        "QIANJS_HAVE_LIBUV=$<BOOL:${QIANJS_NATIVE_NEED_LIBUV}>"
+    )
+    if(QIANJS_NATIVE_NEED_LIBUV)
         target_link_libraries(qianjs_impl PUBLIC qianjs::libuv qianjs::uvw)
     endif()
-
-    if(QIANJS_MODULE_UI)
+    if(QIANJS_NATIVE_NEED_UI)
         include(cmake/ui.cmake)
         target_link_libraries(qianjs_impl PRIVATE qianjs::ui_deps)
     endif()
 
-    # src/native/CMakeLists.txt: appends module sources, runs qianjs_write_native_glue (see src/native/native_modules.cmake).
-    add_subdirectory(src/native)
-
     add_executable(qianjs
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/cli/main.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/app/main.cc
     )
     target_link_libraries(qianjs PRIVATE qianjs_impl)
 

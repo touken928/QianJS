@@ -34,36 +34,54 @@
     },
     {
       "name": "dev",
-      "description": "Default development preset (Debug + tests)",
+      "description": "Default development preset (Debug + tests + desktop profile)",
       "inherits": "debug",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
-        "QIANJS_MODULE_UI": true
+        "QIANJS_PROFILE": "desktop"
       }
     },
     {
       "name": "prod",
-      "description": "Production build (Release, no tests)",
+      "description": "Production build (Release, desktop profile, no tests)",
       "inherits": "release",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
-        "QIANJS_MODULE_UI": true
+        "QIANJS_PROFILE": "desktop"
       }
     },
     {
       "name": "test",
-      "description": "Release build with tests enabled",
+      "description": "Release build with tests (desktop profile)",
       "inherits": "release",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "QIANJS_BUILD_TESTS": true,
-        "QIANJS_MODULE_UI": true
+        "QIANJS_PROFILE": "desktop"
       },
       "warnings": {
         "dev": true,
         "deprecated": true,
         "uninitialized": true,
         "unusedCli": false
+      }
+    },
+    {
+      "name": "minimal",
+      "description": "Minimal profile: console + process only",
+      "inherits": "debug",
+      "binaryDir": "${sourceDir}/build-minimal",
+      "cacheVariables": {
+        "QIANJS_PROFILE": "minimal"
+      }
+    },
+    {
+      "name": "io",
+      "description": "I/O profile: console, process, timers, fs",
+      "inherits": "debug",
+      "binaryDir": "${sourceDir}/build-io",
+      "cacheVariables": {
+        "QIANJS_PROFILE": "io"
       }
     }
   ],
@@ -83,6 +101,16 @@
       "name": "test",
       "configurePreset": "test",
       "jobs": 0
+    },
+    {
+      "name": "minimal",
+      "configurePreset": "minimal",
+      "jobs": 0
+    },
+    {
+      "name": "io",
+      "configurePreset": "io",
+      "jobs": 0
     }
   ],
   "testPresets": [
@@ -96,6 +124,13 @@
     {
       "name": "test",
       "configurePreset": "test",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "io",
+      "configurePreset": "io",
       "output": {
         "outputOnFailure": true
       }

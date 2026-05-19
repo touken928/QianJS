@@ -1,6 +1,6 @@
 # timers 模块（基础定时器）
 
-提供 `setTimeout` / `setInterval` 以及对应清理函数，依赖宿主在脚本结束后 **`drainAsyncWork`**（`qianjs run` / 嵌入路径已包含）：在引擎侧排空微任务并把通过 `event_loop::defer` 投递的回调跑完。
+提供 `setTimeout` / `setInterval` 以及对应清理函数。`qianjs run` 在脚本结束后会调用 **`RuntimeInstance::run_until_idle()`**（排空 libuv、defer 与微任务）。
 
 ## 导入
 
@@ -15,7 +15,7 @@ import { setTimeout, setInterval, clearTimeout, clearInterval } from 'timers';
 - `callback`：无参数函数。
 - `delayMs`：毫秒，负数按 `0` 处理。
 - 返回：`number`（timer id），供 `clearTimeout` 使用。
-- 实现：独立线程休眠后在 **JS 线程**上通过 `event_loop::defer` 调用回调（与 Node 的单线程模型不同，但回调仍在引擎上下文执行）。
+- 实现：`uv_timer_t` 在共享 libuv 循环上触发，经 `event_loop::defer` 在 **JS 主线程** 执行回调。
 
 ### `setInterval(callback, delayMs)`
 
@@ -29,7 +29,7 @@ import { setTimeout, setInterval, clearTimeout, clearInterval } from 'timers';
 
 ## 插件初始化
 
-加载本模块时会调用 `event_loop::ensure_started()`；在启用 `fs` 时会确保 libuv 循环已创建，与 `fs` 异步 I/O 共用同一循环。
+加载本模块时会调用 `event_loop::ensure_started()`；与 `fs`（若启用）共用同一 libuv 循环。
 
 ## 示例
 
@@ -52,4 +52,4 @@ const id = setInterval(() => {
 ## 说明
 
 - 与 Node 不同：不提供全局 `setTimeout`，须从 `'timers'` 导入。
-- 长时间运行的 `setInterval` 应在脚本结束前 `clearInterval`，以免后台线程仍存活（宿主退出前一般仍会排空已投递的 defer；显式清理更稳妥）。
+- 长时间运行的 `setInterval` 应在脚本结束前 `clearInterval`；宿主在 `shutdown` 时会取消未触发的 timer。

@@ -9,6 +9,7 @@
  * 操作：**方向键**或 **WASD**；**R** 游戏结束后重开；**Esc** 或关窗退出。
  */
 import * as ui from 'ui';
+import { createApp, runApp } from 'app';
 import { argv as argvFn } from 'process';
 
 const CELL = 20;
@@ -35,9 +36,6 @@ let score;
 let dead;
 /** 累计物理时间（毫秒），用于固定步长 */
 let moveAcc = 0;
-/** 上一帧墙钟，算 `dt` */
-let lastPhysMs = 0;
-
 function opposite(a, b) {
     return a.x + b.x === 0 && a.y + b.y === 0;
 }
@@ -53,7 +51,6 @@ function reset() {
     score = 0;
     dead = false;
     moveAcc = 0;
-    lastPhysMs = Date.now();
     placeFood();
 }
 
@@ -168,25 +165,31 @@ function draw() {
     }
 }
 
-reset();
-ui.init(W, H, 'Snake — QianJS');
-lastPhysMs = Date.now();
-ui.runLoop((inp) => {
-    const now = Date.now();
-    const dt = Math.max(0, now - lastPhysMs);
-    lastPhysMs = now;
+const runOpts = { width: W, height: H, title: 'Snake — QianJS' };
+if (cap > 0) {
+    runOpts.maxFrames = cap;
+}
 
-    handleEvents(inp.events);
-
-    if (!dead && dt > 0) {
-        moveAcc += dt;
-        while (moveAcc >= STEP_MS) {
-            moveAcc -= STEP_MS;
-            step();
-            if (dead) break;
-        }
-    }
-
-    draw();
-}, cap);
-ui.close();
+runApp(
+    createApp({
+        init() {
+            reset();
+        },
+        update(dt, input) {
+            const ms = Math.max(0, dt * 1000);
+            handleEvents(input.events);
+            if (!dead && ms > 0) {
+                moveAcc += ms;
+                while (moveAcc >= STEP_MS) {
+                    moveAcc -= STEP_MS;
+                    step();
+                    if (dead) break;
+                }
+            }
+        },
+        render() {
+            draw();
+        },
+    }),
+    runOpts
+);

@@ -11,13 +11,10 @@
 #include <vector>
 
 TEST(NativeProcessModule, ArgvPidPlatformCwd) {
-    qjs::JSEngine engine;
-    engine.initialize();
-    qianjs::RuntimeContext runtime;
-    qianjs::test::install_plugins(
-        engine, runtime,
+    qianjs::test::TestRuntime rt(
         {std::string("prog"), std::string("one"), std::string("two")},
         {{"QIANJS_NATIVE_TEST_K", "native_val"}});
+    qjs::JSEngine& engine = rt.engine();
 
     const std::string js = R"(
 import { argv, pid, platform, cwd } from 'process';
@@ -28,7 +25,7 @@ globalThis.__cwd = cwd();
 )";
 
     ASSERT_TRUE(qianjs::test::run_module(engine, "native_process_argv.mjs", js));
-    qianjs::drainAsyncWork(engine);
+    rt.drain();
 
     JSContext* c = engine.ctx();
     EXPECT_EQ(qianjs::test::global_string(c, "__argv"), R"(["prog","one","two"])");
@@ -42,16 +39,13 @@ globalThis.__cwd = cwd();
     EXPECT_EQ(plat, "linux");
 #endif
     EXPECT_NE(qianjs::test::global_string(c, "__cwd"), "");
-
-    engine.cleanup();
 }
 
 TEST(NativeProcessModule, EnvLookupAndFullObject) {
-    qjs::JSEngine engine;
-    engine.initialize();
-    qianjs::RuntimeContext runtime;
-    qianjs::test::install_plugins(engine, runtime, {"prog"},
+    qianjs::test::TestRuntime rt(
+        {"prog"},
         {{"QIANJS_PTEST_A", "v1"}, {"QIANJS_PTEST_B", "v2"}, {"QIANJS_NATIVE_TEST_K", "native_val"}});
+    qjs::JSEngine& engine = rt.engine();
 
     const std::string js = R"(
 import { env } from 'process';
@@ -65,22 +59,18 @@ globalThis.__env_keys = JSON.stringify(
 )";
 
     ASSERT_TRUE(qianjs::test::run_module(engine, "native_process_env.mjs", js));
-    qianjs::drainAsyncWork(engine);
+    rt.drain();
 
     JSContext* c = engine.ctx();
     EXPECT_EQ(qianjs::test::global_string(c, "__env_a"), "v1");
     EXPECT_EQ(qianjs::test::global_string(c, "__env_b"), "v2");
     EXPECT_EQ(qianjs::test::global_string(c, "__env_missing"), "yes");
     EXPECT_EQ(qianjs::test::global_string(c, "__env_keys"), R"(["QIANJS_PTEST_A","QIANJS_PTEST_B"])");
-
-    engine.cleanup();
 }
 
 TEST(NativeProcessModule, SetGetExitCodeAndExitCodeAlias) {
-    qjs::JSEngine engine;
-    engine.initialize();
-    qianjs::RuntimeContext runtime;
-    qianjs::test::install_plugins(engine, runtime, {"prog"}, {});
+    qianjs::test::TestRuntime rt({"prog"}, {});
+    qjs::JSEngine& engine = rt.engine();
 
     const std::string js = R"(
 import { getExitCode, exitCode, setExitCode } from 'process';
@@ -92,15 +82,13 @@ globalThis.__negative = String(getExitCode());
 )";
 
     ASSERT_TRUE(qianjs::test::run_module(engine, "native_process_exit.mjs", js));
-    qianjs::drainAsyncWork(engine);
+    rt.drain();
 
     JSContext* c = engine.ctx();
-    EXPECT_EQ(runtime.exit_code, -3);
+    EXPECT_EQ(rt.instance.host().exit_code, -3);
     EXPECT_EQ(qianjs::test::global_string(c, "__after_set"), "7");
     EXPECT_EQ(qianjs::test::global_string(c, "__alias"), "7");
     EXPECT_EQ(qianjs::test::global_string(c, "__negative"), "-3");
-
-    engine.cleanup();
 }
 
 #endif // QIANJS_MODULE_PROCESS

@@ -7,7 +7,7 @@ set(QIANJS_TEST_SOURCES
 
 if(QIANJS_BUILD_CLI)
     list(APPEND QIANJS_TEST_SOURCES
-        ${CMAKE_CURRENT_SOURCE_DIR}/cli/cli_test.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/cli_test.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/native/js_engine_smoke_test.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/native/process_module_test.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/native/timers_module_test.cc

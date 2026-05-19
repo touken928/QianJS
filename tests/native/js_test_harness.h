@@ -4,8 +4,8 @@
 #include <quickjs.h>
 
 #include "native/default_plugins.h"
+#include "runtime/instance.h"
 #include "runtime/runtime_context.h"
-#include "runtime/script_host.h"
 
 #include <string>
 #include <utility>
@@ -13,15 +13,21 @@
 
 namespace qianjs::test {
 
-/** Wire argv/env host and install all default native plugins (same stack as `qianjs run`). */
-inline void install_plugins(qjs::JSEngine& engine, RuntimeContext& runtime,
-                            std::vector<std::string> argv,
-                            std::vector<std::pair<std::string, std::string>> env) {
-    runtime.argv = std::move(argv);
-    runtime.env = std::move(env);
-    engine.setHost<RuntimeContext>(&runtime);
-    defaultPlugins().installAll(engine, engine.root());
-}
+/** One test run with plugins, active scheduler, and proper shutdown. */
+struct TestRuntime {
+    RuntimeInstance instance;
+
+    TestRuntime(std::vector<std::string> argv,
+                std::vector<std::pair<std::string, std::string>> env = {}) {
+        instance.initialize(defaultPlugins());
+        instance.host().argv = std::move(argv);
+        instance.host().env = std::move(env);
+        instance.begin_script_execution();
+    }
+
+    qjs::JSEngine& engine() { return instance.engine(); }
+    void drain() { instance.run_until_idle(); }
+};
 
 inline bool run_module(qjs::JSEngine& engine, const std::string& virtual_name, const std::string& code) {
     return engine.runModuleCode(virtual_name, code);
@@ -37,8 +43,9 @@ inline std::string global_string(JSContext* c, const char* prop) {
     }
     const char* s = JS_ToCString(c, v);
     std::string out = s ? s : "";
-    if (s)
+    if (s) {
         JS_FreeCString(c, s);
+    }
     JS_FreeValue(c, v);
     return out;
 }
@@ -50,8 +57,9 @@ inline int global_int(JSContext* c, const char* prop, bool* ok = nullptr) {
     int32_t n = 0;
     int r = JS_ToInt32(c, &n, v);
     JS_FreeValue(c, v);
-    if (ok)
+    if (ok) {
         *ok = (r == 0);
+    }
     return static_cast<int>(n);
 }
 
