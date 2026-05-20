@@ -4,6 +4,7 @@
 
 #include <js_engine.h>
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <memory>
