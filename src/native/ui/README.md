@@ -20,8 +20,12 @@
 | `strokeRect(x, y, w, h)` | 描边矩形 |
 | `setLineWidth(w)` | 线宽（`stroke` / `strokeRect` 近似） |
 | `moveTo(x, y)` / `lineTo(x, y)` / `stroke()` | 折线描边 |
+| `createApp({ init?, update, render, shutdown? })` | 注册应用对象；仅 `createApp` 时可在脚本结束后由宿主自动 `runApp` |
+| `runApp(app, opts?)` | 进入帧循环；`opts` 可选：`width`, `height`, `title`, `fps`, `fixedStep`, `maxFrames` |
 
-游戏循环请使用 **`app.runApp(createApp({ update, render }))`**。无窗口 headless：`QIANJS_NULL_UI=1`（见根目录 **`AGENTS.md`**）。
+**游戏循环（可选）**：`ui.runApp(ui.createApp({ init?, update, render, shutdown? }), opts?)` — 由 runtime 驱动帧循环并在每帧 `render` 后自动 `present`。
+
+**手动循环**：`ui.init(w,h,title)` → 循环内 `readEvents`/`pollEvents`、绘制 API、`ui.present()` → `ui.close()`。无窗口 headless：`QIANJS_NULL_UI=1`（见根目录 **`AGENTS.md`**）。
 
 ### `readEvents` / `runApp` 的 `input.events` 元素
 

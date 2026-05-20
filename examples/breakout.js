@@ -7,7 +7,6 @@
  * **鼠标** 或 **A/D**、**左右方向键** 移动挡板；**R** 重开；清完砖块或球落底后按 **R**；**Esc** 或关窗退出。
  */
 import * as ui from 'ui';
-import { createApp, runApp } from 'app';
 import { argv as argvFn } from 'process';
 
 const W = 480;
@@ -246,8 +245,8 @@ if (cap > 0) {
     runOpts.maxFrames = cap;
 }
 
-runApp(
-    createApp({
+ui.runApp(
+    ui.createApp({
         init() {
             reset();
         },

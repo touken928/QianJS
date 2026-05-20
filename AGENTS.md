@@ -15,13 +15,13 @@ ctest --preset=dev --output-on-failure
 
 | Variable | Notes |
 |----------|-------|
-| `QIANJS_PROFILE` | **SKU**: `minimal` (console, process), `io` (+ timers, fs), `desktop` (+ ui, app). Empty/`custom` = use `QIANJS_MODULE_*` options. |
+| `QIANJS_PROFILE` | **SKU**: `minimal` (console, process), `io` (+ timers, fs), `desktop` (+ ui). Empty/`custom` = use `QIANJS_MODULE_*` options. |
 | `QIANJS_MODULE_*` | Per-module override; catalog in [`src/native/native_modules.cmake`](src/native/native_modules.cmake). |
 | `QIANJS_BUILD_PROFILE` / `QIANJS_BUILD_MODULES` | Generated in `qianjs_modules.h` (observability, `help` text). |
 
 Presets `dev` / `test` / `prod` set `QIANJS_PROFILE=desktop`. `io` / `minimal` presets available for SKU CI.
 
-Module DAG: `app` → `ui` → UI_STACK (SDL); `fs`|`timers` → libuv. Glue (`qianjs_default_plugins.g.cc`) registers plugins in topological order.
+Module DAG: `ui` → UI_STACK (SDL + frame loop); `fs`|`timers` → libuv. Glue (`qianjs_default_plugins.g.cc`) registers plugins in topological order.
 
 ## Architecture
 
@@ -76,10 +76,9 @@ Per frame:
 ## JS API
 
 ```javascript
-import { createApp, runApp } from 'app';
 import * as ui from 'ui';
 
-runApp(createApp({
+ui.runApp(ui.createApp({
   init() {},
   update(dt, input) {},
   render() { ui.clear(0,0,0,1); /* ... */ },
@@ -87,7 +86,7 @@ runApp(createApp({
 }), { width: 480, height: 420, title: 'Game', maxFrames: 128, fps: 60, fixedStep: 1/60 });
 ```
 
-`createApp` alone registers a deferred app; `Application::run_script` runs it after the script if `runApp` was not called. Pass a positive integer as the last `argv` entry to cap frames (same as examples).
+`ui.createApp` alone registers a deferred app; `Application::run_script` runs it after the script if `ui.runApp` was not called. Manual loop: `ui.init` → `pollEvents`/`readEvents` → draw → `present`. Pass a positive integer as the last `argv` entry to cap frames (same as examples).
 
 Headless UI (no SDL window): `QIANJS_NULL_UI=1` (DrawList still records; `present` clears without rendering).
 

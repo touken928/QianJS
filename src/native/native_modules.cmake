@@ -38,7 +38,7 @@ function(_qianjs_profile_default_modules PROFILE OUT_VAR)
     elseif(PROFILE STREQUAL "io")
         set(${OUT_VAR} console process timers fs PARENT_SCOPE)
     elseif(PROFILE STREQUAL "desktop")
-        set(${OUT_VAR} console process timers fs ui app PARENT_SCOPE)
+        set(${OUT_VAR} console process timers fs ui PARENT_SCOPE)
     else()
         set(${OUT_VAR} "" PARENT_SCOPE)
     endif()
@@ -72,7 +72,7 @@ function(_qianjs_module_enabled NAME OUT_VAR)
     endif()
 endfunction()
 
-# Enabled = module options (or profile) + transitive DEPS closure (e.g. app enables ui).
+# Enabled = module options (or profile) + transitive DEPS closure.
 function(_qianjs_resolve_enabled_modules OUT_ENABLED)
     get_property(_all GLOBAL PROPERTY QIANJS_MODULE_NAMES)
     set(_enabled "")
@@ -265,14 +265,6 @@ qianjs_module(ui
     CLASS UiPlugin
     HEADER native/ui/ui_module.h
     SOURCES ui/ui_module.cc
-    REQUIRES UI_STACK
-)
-
-qianjs_module(app
-    CLASS AppPlugin
-    HEADER native/app/app_module.h
-    SOURCES app/app_module.cc
-    DEPS ui
     REQUIRES UI_STACK
 )
 

@@ -9,7 +9,6 @@
  * 操作：**方向键**或 **WASD**；**R** 游戏结束后重开；**Esc** 或关窗退出。
  */
 import * as ui from 'ui';
-import { createApp, runApp } from 'app';
 import { argv as argvFn } from 'process';
 
 const CELL = 20;
@@ -170,8 +169,8 @@ if (cap > 0) {
     runOpts.maxFrames = cap;
 }
 
-runApp(
-    createApp({
+ui.runApp(
+    ui.createApp({
         init() {
             reset();
         },

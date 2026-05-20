@@ -19,9 +19,9 @@ All registration lives in **[`native_modules.cmake`](native_modules.cmake)**:
 |---------|---------|
 | `minimal` | console, process |
 | `io` | + timers, fs |
-| `desktop` | + ui, app |
+| `desktop` | + ui |
 
-`app` **DEPS** `ui`; enabling `app` auto-enables `ui`. `fs` / `timers` **REQUIRES** `LIBUV` (links `qianjs::libuv` / `uvw`). `ui` / `app` **REQUIRES** `UI_STACK` (SDL + `src/platform/`, frame loop).
+`fs` / `timers` **REQUIRES** `LIBUV` (links `qianjs::libuv` / `uvw`). `ui` **REQUIRES** `UI_STACK` (SDL + `src/platform/`, frame loop); optional `ui.createApp` / `ui.runApp` or manual `init` + `present` loop.
 
 ### Generated glue (do not edit)
 

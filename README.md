@@ -103,7 +103,7 @@ qianjs embed dist/main.qbc        # 生成可独立运行的可执行文件副�
 |---------|----------|
 | `minimal` | console, process |
 | `io` | + timers, fs（链接 libuv） |
-| `desktop` | + ui, app（SDL2 子模块） |
+| `desktop` | + ui（SDL2 子模块；含 `createApp`/`runApp` 与底层绘制 API） |
 
 `cmake --preset=dev` 使用 `QIANJS_PROFILE=desktop`。另有 `minimal` / `io` preset 便于 SKU 构建。
 
