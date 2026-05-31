@@ -42,7 +42,7 @@ int Application::run_script(const std::filesystem::path& input_path, std::vector
         return 1;
     }
 
-#if QIANJS_MODULE_UI
+#if QIANJS_MODULE_GAME
     FrameLoopOptions frame_opts;
     if (instance.host().argv.size() > 1) {
         try {

@@ -4,15 +4,14 @@
 #include <qjs/value.h>
 
 namespace qianjs::platform {
-class PlatformWindow;
+class PlatformCanvas;
 }
 
 namespace qianjs::systems {
 
-/** Runs `render()` and presents the deferred DrawList. */
 class RenderSystem {
 public:
-    bool render_frame(platform::PlatformWindow& win, qjs::Engine& engine, const qjs::Value& render_fn);
+    bool render_frame(platform::PlatformCanvas& canvas, qjs::Engine& engine, const qjs::Value& render_fn);
 };
 
 } // namespace qianjs::systems

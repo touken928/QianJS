@@ -33,7 +33,7 @@ jobs:
       - name: Unit tests (ctest)
         run: ctest --preset=dev --output-on-failure
 
-      - name: UI module smoke (SDL dummy driver)
+      - name: Canvas module smoke (headless)
         env:
-          SDL_VIDEODRIVER: dummy
+          QIANJS_NULL_UI: "1"
         run: ./build/bin/qianjs run examples/breakout.js 128

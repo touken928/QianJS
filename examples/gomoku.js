@@ -1,12 +1,11 @@
 /**
- * 双人五子棋（本地对弈，轮流落子）— 需 `ui` 模块（`-DQIANJS_MODULE_UI=ON` + SDL2 子模块）。
+ * 双人五子棋 — `canvas` + `game`。
  *
  * 运行：`qianjs run examples/gomoku.js`
- * 无头/CI：`SDL_VIDEODRIVER=dummy qianjs run examples/gomoku.js 5000`（数字为最大帧数，可选）
- *
- * 规则：15×15 路、五连即胜；**黑先**。**鼠标左键**在交叉点附近落子；**R** 重开；**Esc** 或关窗退出。
+ * 无头：`QIANJS_NULL_UI=1 qianjs run examples/gomoku.js 5000`
  */
-import * as ui from 'ui';
+import * as canvas from 'canvas';
+import * as game from 'game';
 import { argv as argvFn } from 'process';
 
 const SIZE = 15;
@@ -23,11 +22,16 @@ const argv = argvFn();
 const maxFrames = argv.length > 1 ? parseInt(argv[1], 10) : -1;
 const cap = Number.isFinite(maxFrames) && maxFrames > 0 ? maxFrames : -1;
 
+const cvs = canvas.createCanvas(W, H, { title: '五子棋 — QianJS' });
+const ctx = cvs.getContext('2d');
+
+function rgba(r, g, b, a) {
+    return `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
+}
+
 /** @type {number[][]} */
 let board;
-/** 1 = 黑, 2 = 白 */
 let turn;
-/** 0 = 未结束, 1 = 黑胜, 2 = 白胜 */
 let winner;
 /** @type {{ cx: number, cy: number } | null} */
 let lastMove;
@@ -48,7 +52,6 @@ function gridToPixel(cx, cy) {
     return { x: MARGIN + cx * CELL, y: TOP + cy * CELL };
 }
 
-/** @returns {{ cx: number, cy: number } | null} */
 function pixelToGrid(mx, my) {
     const cx = Math.round((mx - MARGIN) / CELL);
     const cy = Math.round((my - TOP) / CELL);
@@ -72,7 +75,6 @@ function countDir(r, c, dr, dc, side) {
     return n;
 }
 
-/** `r` 行、`c` 列，与 `board[r][c]` 一致 */
 function checkWin(r, c, side) {
     const dirs = [
         [1, 0],
@@ -102,11 +104,11 @@ function tryPlace(cx, cy) {
 }
 
 function fillDisk(px, py, radius, r, g, b, a) {
-    ui.setSourceRGBA(r, g, b, a);
+    ctx.setFillStyle(rgba(r, g, b, a));
     const r0 = radius | 0;
     for (let dy = -r0; dy <= r0; dy++) {
         const w = Math.sqrt(Math.max(0, radius * radius - dy * dy)) | 0;
-        ui.fillRect((px - w) | 0, (py + dy) | 0, w * 2 + 1, 1);
+        ctx.fillRect((px - w) | 0, (py + dy) | 0, w * 2 + 1, 1);
     }
 }
 
@@ -125,24 +127,27 @@ function handleEvents(events) {
 }
 
 function draw() {
-    ui.clear(0.18, 0.14, 0.1, 1);
+    ctx.setFillStyle(rgba(0.18, 0.14, 0.1, 1));
+    ctx.clearRect(0, 0, W, H);
 
-    ui.setSourceRGBA(0.92, 0.82, 0.62, 1);
-    ui.fillRect(MARGIN - 8, TOP - 8, (SIZE - 1) * CELL + 16, (SIZE - 1) * CELL + 16);
+    ctx.setFillStyle(rgba(0.92, 0.82, 0.62, 1));
+    ctx.fillRect(MARGIN - 8, TOP - 8, (SIZE - 1) * CELL + 16, (SIZE - 1) * CELL + 16);
 
-    ui.setSourceRGBA(0.12, 0.1, 0.08, 1);
-    ui.setLineWidth(1.5);
+    ctx.setStrokeStyle(rgba(0.12, 0.1, 0.08, 1));
+    ctx.setLineWidth(1.5);
     for (let i = 0; i < SIZE; i++) {
         const x0 = MARGIN + i * CELL;
         const y0 = TOP;
         const y1 = TOP + (SIZE - 1) * CELL;
-        ui.moveTo(x0, y0);
-        ui.lineTo(x0, y1);
-        ui.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x0, y1);
+        ctx.stroke();
         const yy = TOP + i * CELL;
-        ui.moveTo(MARGIN, yy);
-        ui.lineTo(MARGIN + (SIZE - 1) * CELL, yy);
-        ui.stroke();
+        ctx.beginPath();
+        ctx.moveTo(MARGIN, yy);
+        ctx.lineTo(MARGIN + (SIZE - 1) * CELL, yy);
+        ctx.stroke();
     }
 
     const stars = [
@@ -156,8 +161,8 @@ function draw() {
         const sx = stars[s][0];
         const sy = stars[s][1];
         const p = gridToPixel(sx, sy);
-        ui.setSourceRGBA(0.22, 0.16, 0.12, 1);
-        ui.fillRect(p.x - 2, p.y - 2, 5, 5);
+        ctx.setFillStyle(rgba(0.22, 0.16, 0.12, 1));
+        ctx.fillRect(p.x - 2, p.y - 2, 5, 5);
     }
 
     for (let cy = 0; cy < SIZE; cy++) {
@@ -172,43 +177,37 @@ function draw() {
 
     if (lastMove !== null && winner === 0) {
         const p = gridToPixel(lastMove.cx, lastMove.cy);
-        ui.setSourceRGBA(0.95, 0.75, 0.2, 0.85);
-        ui.strokeRect(p.x - STONE_R - 2, p.y - STONE_R - 2, (STONE_R + 2) * 2, (STONE_R + 2) * 2);
+        ctx.setStrokeStyle(rgba(0.95, 0.75, 0.2, 0.85));
+        ctx.setLineWidth(1);
+        ctx.strokeRect(p.x - STONE_R - 2, p.y - STONE_R - 2, (STONE_R + 2) * 2, (STONE_R + 2) * 2);
     }
 
-    /* 顶栏：黑白子示意；金框 = 当前行棋方；红框 = 获胜方（ui 无文字 API，状态见标题与框） */
-    ui.setSourceRGBA(0.92, 0.89, 0.84, 1);
-    ui.fillRect(0, 0, W, TOP - 4);
+    ctx.setFillStyle(rgba(0.92, 0.89, 0.84, 1));
+    ctx.fillRect(0, 0, W, TOP - 4);
     fillDisk(28, 26, 11, 0.06, 0.06, 0.08, 1);
     fillDisk(76, 26, 11, 0.93, 0.93, 0.95, 1);
-    ui.setLineWidth(3);
+    ctx.setLineWidth(3);
     if (winner === 0) {
-        ui.setSourceRGBA(0.95, 0.75, 0.15, 1);
-        if (turn === 1) ui.strokeRect(14, 12, 28, 28);
-        else ui.strokeRect(62, 12, 28, 28);
+        ctx.setStrokeStyle(rgba(0.95, 0.75, 0.15, 1));
+        if (turn === 1) ctx.strokeRect(14, 12, 28, 28);
+        else ctx.strokeRect(62, 12, 28, 28);
     } else {
-        ui.setSourceRGBA(0.92, 0.22, 0.12, 1);
-        if (winner === 1) ui.strokeRect(10, 8, 36, 36);
-        else ui.strokeRect(58, 8, 36, 36);
+        ctx.setStrokeStyle(rgba(0.92, 0.22, 0.12, 1));
+        if (winner === 1) ctx.strokeRect(10, 8, 36, 36);
+        else ctx.strokeRect(58, 8, 36, 36);
     }
 
     if (winner !== 0) {
-        ui.setSourceRGBA(0.12, 0.06, 0.05, 0.5);
-        ui.fillRect(MARGIN - 8, TOP - 8, (SIZE - 1) * CELL + 16, (SIZE - 1) * CELL + 16);
+        ctx.setFillStyle(rgba(0.12, 0.06, 0.05, 0.5));
+        ctx.fillRect(MARGIN - 8, TOP - 8, (SIZE - 1) * CELL + 16, (SIZE - 1) * CELL + 16);
     }
 }
 
-const runOpts = {
-    width: W,
-    height: H,
-    title: '五子棋 — 黑先 | 鼠标左键落子 | R 重开 | 顶栏金框=行棋方',
-};
-if (cap > 0) {
-    runOpts.maxFrames = cap;
-}
+const runOpts = { maxFrames: cap > 0 ? cap : -1 };
 
-ui.runApp(
-    ui.createApp({
+game.run(
+    cvs,
+    {
         init() {
             reset();
         },
@@ -218,6 +217,6 @@ ui.runApp(
         render() {
             draw();
         },
-    }),
+    },
     runOpts
 );

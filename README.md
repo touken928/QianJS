@@ -103,14 +103,14 @@ qianjs embed dist/main.qbc        # 生成可独立运行的可执行文件副�
 |---------|----------|
 | `minimal` | console, process |
 | `io` | + timers, fs（链接 libuv） |
-| `desktop` | + ui（SDL2 子模块；含 `createApp`/`runApp` 与底层绘制 API） |
+| `desktop` | + canvas（Canvas 2D 子集）+ game（`game.run` 帧循环） |
 
 `cmake --preset=dev` 使用 `QIANJS_PROFILE=desktop`。另有 `minimal` / `io` preset 便于 SKU 构建。
 
 说明：
 
 - `fs` / `timers` 关闭时不会链接 `libuv/uvw`（`QIANJS_HAVE_LIBUV=0`）。
-- `desktop` 需子模块 **`third_party/sdl2`**。无头/CI：`SDL_VIDEODRIVER=dummy`，示例可传最大帧数如 `qianjs run examples/snake.js 64`。
+- `desktop` 需子模块 **`third_party/sdl2`** 与 **`third_party/nanovg`**。无头/CI：`QIANJS_NULL_UI=1`，示例可传最大帧数如 `qianjs run examples/snake.js 64`。
 - 生成头文件：`build/generated/qianjs_modules.h`（含 `QIANJS_BUILD_PROFILE`、`QIANJS_BUILD_MODULES`）、`qianjs_default_plugins.g.h`。
 - `qianjs help` 打印当前构建的 profile 与模块列表。
 
@@ -153,11 +153,12 @@ ctest --preset=test --output-on-failure
 - [`process`](src/native/process/README.md)
 - [`timers`](src/native/timers/README.md)
 - [`fs`](src/native/fs/README.md)
-- [`ui`](src/native/ui/README.md)（可选模块，默认关闭）
+- [`canvas`](src/native/canvas/README.md)（desktop）
+- [`game`](src/native/game/README.md)（desktop，依赖 canvas）
 
 模块 CMake 接线和目录规范：[`src/native/README.md`](src/native/README.md)。
 
-弹球打砖块：`examples/breakout.js`；贪吃蛇：`examples/snake.js`；双人五子棋：`examples/gomoku.js`（均需构建时打开 `QIANJS_MODULE_UI`）。
+弹球打砖块：`examples/breakout.js`；贪吃蛇：`examples/snake.js`；双人五子棋：`examples/gomoku.js`（`canvas` + `game`）；多窗口（仅 `canvas` + `timers`）：`examples/multi_windows.js`。
 
 ---
 
@@ -165,13 +166,14 @@ ctest --preset=test --output-on-failure
 
 | 路径 | 说明 |
 |------|------|
-| `cmake/` | 第三方依赖封装（`qjs`、`libuv`、`uvw`、`ui`→SDL2 等） |
+| `cmake/` | 第三方依赖封装（`qjs`、`libuv`、`uvw`、`ui.cmake`→SDL2、`nanovg.cmake` 等） |
 | `src/app/` | CLI（`main`、`cli`、子命令）与 `Application` 脚本宿主 |
 | `src/runtime/` | `RuntimeInstance`、调度器、帧循环、嵌入辅助 |
 | `src/native/` | 内置 native 模块与自动胶水生成 |
 | `tests/` | `qianjs_tests`（目录布局对齐 `src/`，见 [`tests/README.md`](tests/README.md)） |
 | `third_party/qjs` | qjs 子模块（封装与 QuickJS 拉取逻辑） |
-| `third_party/sdl2` | SDL2 源码子模块（仅 `QIANJS_MODULE_UI=ON` 时由 `cmake/ui.cmake` 编入） |
+| `third_party/sdl2` | SDL2 源码子模块（canvas UI stack） |
+| `third_party/nanovg` | NanoVG（Canvas 2D 绘制） |
 
 更多构建策略见：[`cmake/README.md`](cmake/README.md)。
 
@@ -185,7 +187,7 @@ ctest --preset=test --output-on-failure
 | qjs | 子模块 [touken928/qjs](https://github.com/touken928/qjs) |
 | libuv / uvw | 子模块 |
 | GoogleTest | CMake **FetchContent**，写在根 **`CMakeLists.txt`**（`QIANJS_BUILD_TESTS=ON` 时；首次 configure 需联网） |
-| SDL2 | 子模块 **`third_party/sdl2`**（[libsdl-org/SDL](https://github.com/libsdl-org/SDL)）；仅 **`QIANJS_MODULE_UI=ON`** 时由 **`cmake/ui.cmake`** `add_subdirectory` 静态编译 |
+| SDL2 / NanoVG | 子模块 **`third_party/sdl2`**、**`third_party/nanovg`**；desktop / **`QIANJS_MODULE_CANVAS`** 时编入 |
 
 ---
 

@@ -19,9 +19,9 @@ All registration lives in **[`native_modules.cmake`](native_modules.cmake)**:
 |---------|---------|
 | `minimal` | console, process |
 | `io` | + timers, fs |
-| `desktop` | + ui |
+| `desktop` | + canvas, game |
 
-`fs` / `timers` **REQUIRES** `LIBUV` (links `qianjs::libuv` / `uvw`). `ui` **REQUIRES** `UI_STACK` (SDL + `src/platform/`, frame loop); optional `ui.createApp` / `ui.runApp` or manual `init` + `present` loop.
+`fs` / `timers` **REQUIRES** `LIBUV`. `canvas` **REQUIRES** `UI_STACK` (SDL + NanoVG + `src/platform/`). `game` **DEPS** `canvas`, **REQUIRES** `GAME_STACK` (`frame_loop`, input/render systems); `game.run` / `game.isKeyDown`.
 
 ### Generated glue (do not edit)
 

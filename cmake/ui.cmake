@@ -1,4 +1,4 @@
-# third_party/sdl2 — SDL2 静态库，供 native `ui` 模块（与 libuv 同构的 submodule + add_subdirectory）。
+# third_party/sdl2 — SDL2 静态库，供 native `canvas` 模块（窗口与事件；与 libuv 同构的 submodule + add_subdirectory）。
 
 if(TARGET qianjs::ui_deps)
     return()

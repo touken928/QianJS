@@ -9,7 +9,7 @@
 #include <vector>
 
 namespace qianjs::platform {
-class PlatformWindow;
+class PlatformCanvas;
 }
 
 namespace qianjs::systems {
@@ -23,8 +23,9 @@ struct InputFrame {
 /** Poll SDL (or null platform) and build the `input` object for `update(dt, input)`. */
 class InputSystem {
 public:
-    bool poll(platform::PlatformWindow& win, std::vector<SDL_Event>& batch, bool& should_quit);
-    qjs::Value build_input_object(qjs::Engine& engine, const std::vector<SDL_Event>& batch, const InputFrame& frame) const;
+    bool poll(platform::PlatformCanvas& canvas, std::vector<SDL_Event>& batch, bool& should_quit);
+    qjs::Value build_input_object(qjs::Engine& engine, platform::PlatformCanvas& canvas,
+        const std::vector<SDL_Event>& batch, const InputFrame& frame) const;
 };
 
 } // namespace qianjs::systems

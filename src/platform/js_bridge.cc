@@ -80,9 +80,19 @@ qjs::Value sdl_event_to_value(qjs::Engine& engine, const SDL_Event& e) {
     }
 }
 
-qjs::Value events_to_value(qjs::Engine& engine, const std::vector<SDL_Event>& events) {
+qjs::Value events_to_value(qjs::Engine& engine, const std::vector<SDL_Event>& events, Uint32 window_id) {
     auto arr = engine.array();
     for (const SDL_Event& e : events) {
+        if (window_id != 0 && e.type != SDL_QUIT) {
+            if (e.type == SDL_WINDOWEVENT && e.window.windowID != window_id) {
+                continue;
+            }
+            if ((e.type == SDL_KEYDOWN || e.type == SDL_KEYUP || e.type == SDL_MOUSEMOTION ||
+                    e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_MOUSEBUTTONUP || e.type == SDL_MOUSEWHEEL) &&
+                e.window.windowID != 0 && e.window.windowID != window_id) {
+                continue;
+            }
+        }
         qjs::Value item = sdl_event_to_value(engine, e);
         if (item.isNull()) {
             continue;
@@ -92,12 +102,23 @@ qjs::Value events_to_value(qjs::Engine& engine, const std::vector<SDL_Event>& ev
     return arr.build();
 }
 
-qjs::Value mouse_state_value(qjs::Engine& engine, bool null_mode) {
+qjs::Value mouse_state_value(qjs::Engine& engine, bool null_mode, SDL_Window* window) {
     int x = 0;
     int y = 0;
     Uint32 mask = 0;
     if (!null_mode) {
-        mask = SDL_GetMouseState(&x, &y);
+        if (window && SDL_GetMouseFocus() != window) {
+            mask = 0;
+        } else {
+            mask = SDL_GetMouseState(&x, &y);
+            if (window) {
+                int wx = 0;
+                int wy = 0;
+                SDL_GetWindowPosition(window, &wx, &wy);
+                x -= wx;
+                y -= wy;
+            }
+        }
     }
     const auto down = [mask](int btn) { return (mask & SDL_BUTTON(btn)) != 0; };
     qjs::Value buttons = engine.object()

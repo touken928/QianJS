@@ -3,11 +3,16 @@
 #include "runtime/embed.h"
 #include "runtime/plugin_lifecycle.h"
 
-#if QIANJS_MODULE_UI
-#include "platform/platform_window.h"
+#if QIANJS_MODULE_CANVAS
+#include "platform/canvas_registry.h"
+#endif
+
+#if QIANJS_MODULE_GAME
+#include "platform/platform_canvas.h"
 
 namespace qianjs {
-bool run_frame_loop_impl(RuntimeInstance& instance, AppHost& app, const FrameLoopOptions& options);
+bool run_frame_loop_impl(RuntimeInstance& instance, platform::PlatformCanvas& canvas, AppHost& app,
+    const FrameLoopOptions& options);
 }
 #endif
 
@@ -20,6 +25,9 @@ thread_local RuntimeInstance* RuntimeInstance::current_ = nullptr;
 
 RuntimeInstance::RuntimeInstance() {
     scheduler_.bind_runtime(this);
+#if QIANJS_MODULE_CANVAS
+    canvases_ = std::make_unique<platform::CanvasRegistry>();
+#endif
 }
 
 RuntimeInstance::~RuntimeInstance() {
@@ -66,31 +74,18 @@ void RuntimeInstance::notify_plugins_shutdown() {
     notify_lifecycle(LifecyclePhase::Shutdown, *this);
 }
 
-#if QIANJS_MODULE_UI
+#if QIANJS_MODULE_GAME
 
-platform::PlatformWindow& RuntimeInstance::ensure_window() {
-    if (!window_) {
-        window_ = std::make_unique<platform::PlatformWindow>();
-    }
-    return *window_;
+bool RuntimeInstance::run_frame_loop(platform::PlatformCanvas& canvas, AppHost& app, const FrameLoopOptions& options) {
+    return qianjs::run_frame_loop_impl(*this, canvas, app, options);
 }
 
-void RuntimeInstance::destroy_window() {
-    if (window_) {
-        window_->destroy();
-        window_.reset();
-    }
-}
-
-bool RuntimeInstance::run_frame_loop(AppHost& app, const FrameLoopOptions& options) {
-    return qianjs::run_frame_loop_impl(*this, app, options);
-}
-
-void RuntimeInstance::set_deferred_app(qjs::Value app_obj) {
+void RuntimeInstance::set_deferred_app(uint64_t canvas_id, qjs::Value app_obj) {
     clear_deferred_app();
     if (!deferred_app_.load_from_object(std::move(app_obj))) {
         return;
     }
+    deferred_canvas_id_ = canvas_id;
     has_deferred_app_ = deferred_app_.has_hooks();
 }
 
@@ -99,15 +94,22 @@ void RuntimeInstance::clear_deferred_app() {
         return;
     }
     deferred_app_.release();
+    deferred_canvas_id_ = 0;
     has_deferred_app_ = false;
 }
 
 bool RuntimeInstance::try_run_deferred_app(const FrameLoopOptions& options) {
-    if (!has_deferred_app_) {
+    if (!has_deferred_app_ || deferred_canvas_id_ == 0) {
         return false;
     }
-    const bool ok = run_frame_loop(deferred_app_, options);
+    platform::PlatformCanvas* canvas = canvases_->get(deferred_canvas_id_);
+    if (!canvas) {
+        has_deferred_app_ = false;
+        return false;
+    }
+    const bool ok = run_frame_loop(*canvas, deferred_app_, options);
     has_deferred_app_ = false;
+    deferred_canvas_id_ = 0;
     return ok;
 }
 
@@ -141,8 +143,13 @@ void RuntimeInstance::shutdown() {
     deactivate();
     ++generation_;
 
-#if QIANJS_MODULE_UI
+#if QIANJS_MODULE_GAME
     clear_deferred_app();
+#endif
+#if QIANJS_MODULE_CANVAS
+    if (canvases_) {
+        canvases_->destroy_all();
+    }
 #endif
     reject_pending_promises();
 

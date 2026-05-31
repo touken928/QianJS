@@ -1,10 +1,10 @@
 #include <qianjs_modules.h>
 
-#if !QIANJS_MODULE_UI
-#error "frame_loop.cc requires QIANJS_MODULE_UI"
+#if !QIANJS_MODULE_GAME
+#error "frame_loop.cc requires QIANJS_MODULE_GAME"
 #endif
 
-#include "platform/platform_window.h"
+#include "platform/platform_canvas.h"
 #include "runtime/app_host.h"
 #include "runtime/clock.h"
 #include "runtime/instance.h"
@@ -34,14 +34,9 @@ bool call_update(qjs::Engine& engine, const qjs::Value& fn, double dt, const qjs
 
 } // namespace
 
-bool run_frame_loop_impl(RuntimeInstance& instance, AppHost& app, const FrameLoopOptions& options) {
+bool run_frame_loop_impl(RuntimeInstance& instance, platform::PlatformCanvas& canvas, AppHost& app,
+    const FrameLoopOptions& options) {
     if (!app.has_hooks()) {
-        return false;
-    }
-
-    platform::PlatformWindow& win = instance.ensure_window();
-    if (!win.init(options.width, options.height, options.title ? options.title : "QianJS")) {
-        std::cerr << "runApp: failed to create window\n";
         return false;
     }
 
@@ -84,7 +79,7 @@ bool run_frame_loop_impl(RuntimeInstance& instance, AppHost& app, const FrameLoo
 
         std::vector<SDL_Event> batch;
         bool quit = false;
-        input_sys.poll(win, batch, quit);
+        input_sys.poll(canvas, batch, quit);
         if (quit) {
             running = false;
         }
@@ -92,7 +87,7 @@ bool run_frame_loop_impl(RuntimeInstance& instance, AppHost& app, const FrameLoo
         instance.pump_async();
 
         systems::InputFrame input_frame{frame, real_dt, clock.alpha()};
-        qjs::Value input = input_sys.build_input_object(engine, batch, input_frame);
+        qjs::Value input = input_sys.build_input_object(engine, canvas, batch, input_frame);
         if (!input.valid()) {
             std::cerr << "app input build error\n";
             running = false;
@@ -116,7 +111,7 @@ bool run_frame_loop_impl(RuntimeInstance& instance, AppHost& app, const FrameLoo
 
         if (running) {
             instance.pump_microtasks();
-            if (!render_sys.render_frame(win, engine, app.render_fn())) {
+            if (!render_sys.render_frame(canvas, engine, app.render_fn())) {
                 std::cerr << "app render error\n";
                 running = false;
             }

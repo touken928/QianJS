@@ -13,6 +13,8 @@ if(QIANJS_BUILD_CLI)
         ${CMAKE_CURRENT_SOURCE_DIR}/native/timers_module_test.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/native/console_module_test.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/native/fs_module_test.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/native/canvas_module_test.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/native/game_module_test.cc
     )
 endif()
 

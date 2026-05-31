@@ -1,12 +1,11 @@
 /**
- * 弹球打砖块 — 需 `ui` 模块（`-DQIANJS_MODULE_UI=ON` + SDL2 子模块）。
+ * 弹球打砖块 — `canvas` + `game`（desktop profile）。
  *
  * 运行：`qianjs run examples/breakout.js`
- * 无头/CI：`SDL_VIDEODRIVER=dummy qianjs run examples/breakout.js 2000`（数字为最大帧数，可选）
- *
- * **鼠标** 或 **A/D**、**左右方向键** 移动挡板；**R** 重开；清完砖块或球落底后按 **R**；**Esc** 或关窗退出。
+ * 无头：`QIANJS_NULL_UI=1 qianjs run examples/breakout.js 2000`
  */
-import * as ui from 'ui';
+import * as canvas from 'canvas';
+import * as game from 'game';
 import { argv as argvFn } from 'process';
 
 const W = 480;
@@ -28,15 +27,21 @@ const cap = Number.isFinite(maxFrames) && maxFrames > 0 ? maxFrames : -1;
 
 const brickW = (W - 2 * BRICK_MARGIN - (BRICK_COLS - 1) * BRICK_GAP) / BRICK_COLS;
 
+const cvs = canvas.createCanvas(W, H, { title: '打砖块 — QianJS' });
+const ctx = cvs.getContext('2d');
+
+function rgba(r, g, b, a) {
+    return `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
+}
+
 /** @type {{ alive: boolean, x: number, y: number, hue: number }[]} */
 let bricks;
 /** @type {{ x: number, y: number, vx: number, vy: number }} */
 let ball;
-/** @type {number} 挡板左缘 x */
 let paddleX;
 let score;
-/** 'play' | 'lost' | 'won' */
 let phase;
+
 function reset() {
     bricks = [];
     for (let row = 0; row < BRICK_ROWS; row++) {
@@ -128,11 +133,11 @@ function step(dt) {
 }
 
 function fillDisk(px, py, radius, r, g, b, a) {
-    ui.setSourceRGBA(r, g, b, a);
+    ctx.setFillStyle(rgba(r, g, b, a));
     const r0 = radius | 0;
     for (let dy = -r0; dy <= r0; dy++) {
         const w = Math.sqrt(Math.max(0, radius * radius - dy * dy)) | 0;
-        ui.fillRect((px - w) | 0, (py + dy) | 0, w * 2 + 1, 1);
+        ctx.fillRect((px - w) | 0, (py + dy) | 0, w * 2 + 1, 1);
     }
 }
 
@@ -187,78 +192,72 @@ function handleEvents(events) {
             const k = ev.key || '';
             if (k === 'r' || k === 'R') {
                 reset();
-                continue;
             }
         }
     }
 }
 
-function syncPaddle() {
-    const m = ui.getMouseState();
+function syncPaddle(input) {
+    const m = input.mouse;
     paddleX = m.x - PADDLE_W / 2;
     const step = 10;
-    if (ui.isKeyDown('Left') || ui.isKeyDown('a') || ui.isKeyDown('A')) paddleX -= step;
-    if (ui.isKeyDown('Right') || ui.isKeyDown('d') || ui.isKeyDown('D')) paddleX += step;
+    if (game.isKeyDown('Left') || game.isKeyDown('a') || game.isKeyDown('A')) paddleX -= step;
+    if (game.isKeyDown('Right') || game.isKeyDown('d') || game.isKeyDown('D')) paddleX += step;
     paddleX = Math.max(0, Math.min(W - PADDLE_W, paddleX));
 }
 
 function draw() {
-    ui.clear(0.08, 0.09, 0.12, 1);
+    ctx.setFillStyle(rgba(0.08, 0.09, 0.12, 1));
+    ctx.clearRect(0, 0, W, H);
 
-    ui.setSourceRGBA(0.15, 0.17, 0.22, 1);
-    ui.fillRect(0, 0, W, 44);
-    ui.setSourceRGBA(0.85, 0.88, 0.92, 1);
-    ui.fillRect(12, 14, Math.min(W - 24, 100 + score * 2), 6);
+    ctx.setFillStyle(rgba(0.15, 0.17, 0.22, 1));
+    ctx.fillRect(0, 0, W, 44);
+    ctx.setFillStyle(rgba(0.85, 0.88, 0.92, 1));
+    ctx.fillRect(12, 14, Math.min(W - 24, 100 + score * 2), 6);
 
     for (let i = 0; i < bricks.length; i++) {
         const b = bricks[i];
         if (!b.alive) continue;
         const rgb = hsvToRgb(b.hue, 0.55, 0.92);
-        ui.setSourceRGBA(rgb.r, rgb.g, rgb.b, 1);
-        ui.fillRect(b.x | 0, b.y | 0, brickW, BRICK_H);
-        ui.setSourceRGBA(0.04, 0.04, 0.06, 1);
-        ui.setLineWidth(1);
-        ui.strokeRect(b.x | 0, b.y | 0, brickW, BRICK_H);
+        ctx.setFillStyle(rgba(rgb.r, rgb.g, rgb.b, 1));
+        ctx.fillRect(b.x | 0, b.y | 0, brickW, BRICK_H);
+        ctx.setStrokeStyle(rgba(0.04, 0.04, 0.06, 1));
+        ctx.setLineWidth(1);
+        ctx.strokeRect(b.x | 0, b.y | 0, brickW, BRICK_H);
     }
 
-    ui.setSourceRGBA(0.35, 0.75, 0.95, 1);
-    ui.fillRect(paddleX | 0, PADDLE_Y | 0, PADDLE_W, PADDLE_H);
+    ctx.setFillStyle(rgba(0.35, 0.75, 0.95, 1));
+    ctx.fillRect(paddleX | 0, PADDLE_Y | 0, PADDLE_W, PADDLE_H);
 
     fillDisk(ball.x, ball.y, BALL_R, 0.98, 0.92, 0.35, 1);
 
     if (phase === 'lost' || phase === 'won') {
-        ui.setSourceRGBA(0.05, 0.05, 0.08, 0.55);
-        ui.fillRect(0, BRICK_TOP - 8, W, H - BRICK_TOP + 8);
-        ui.setSourceRGBA(0.9, 0.35, 0.2, 0.9);
-        ui.fillRect(W * 0.2, H * 0.42, W * 0.6, 10);
-        ui.setSourceRGBA(0.85, 0.86, 0.9, 0.85);
-        ui.fillRect(W * 0.28, H * 0.52, W * 0.44, 6);
+        ctx.setFillStyle(rgba(0.05, 0.05, 0.08, 0.55));
+        ctx.fillRect(0, BRICK_TOP - 8, W, H - BRICK_TOP + 8);
+        ctx.setFillStyle(rgba(0.9, 0.35, 0.2, 0.9));
+        ctx.fillRect(W * 0.2, H * 0.42, W * 0.6, 10);
+        ctx.setFillStyle(rgba(0.85, 0.86, 0.9, 0.85));
+        ctx.fillRect(W * 0.28, H * 0.52, W * 0.44, 6);
     }
 }
 
-const runOpts = {
-    width: W,
-    height: H,
-    title: '打砖块 — 鼠标/A/D 挡板 | R 重开 | 清砖胜利',
-};
-if (cap > 0) {
-    runOpts.maxFrames = cap;
-}
+const runOpts = { maxFrames: cap > 0 ? cap : -1, fps: 60 };
 
-ui.runApp(
-    ui.createApp({
+game.run(
+    cvs,
+    {
         init() {
             reset();
         },
         update(dt, input) {
             const stepDt = Math.min(0.05, Math.max(0, dt));
             handleEvents(input.events);
-            syncPaddle();
+            syncPaddle(input);
             step(stepDt);
         },
         render() {
             draw();
         },
-    }),
+    },
     runOpts
 );

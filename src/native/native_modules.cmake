@@ -38,7 +38,7 @@ function(_qianjs_profile_default_modules PROFILE OUT_VAR)
     elseif(PROFILE STREQUAL "io")
         set(${OUT_VAR} console process timers fs PARENT_SCOPE)
     elseif(PROFILE STREQUAL "desktop")
-        set(${OUT_VAR} console process timers fs ui PARENT_SCOPE)
+        set(${OUT_VAR} console process timers fs canvas game PARENT_SCOPE)
     else()
         set(${OUT_VAR} "" PARENT_SCOPE)
     endif()
@@ -211,10 +211,16 @@ function(qianjs_native_attach TARGET)
         if("UI_STACK" IN_LIST _requires)
             set(_need_ui ON)
         endif()
+        if("GAME_STACK" IN_LIST _requires)
+            set(_need_game ON)
+        endif()
     endforeach()
 
     if(_need_ui)
         _qianjs_attach_ui_stack(${TARGET})
+    endif()
+    if(_need_game)
+        _qianjs_attach_game_stack(${TARGET})
     endif()
 
     _qianjs_write_generated_headers("${_sorted}" "${CMAKE_BINARY_DIR}/generated" "${QIANJS_PROFILE}")
@@ -261,18 +267,33 @@ qianjs_module(fs
     REQUIRES LIBUV
 )
 
-qianjs_module(ui
-    CLASS UiPlugin
-    HEADER native/ui/ui_module.h
-    SOURCES ui/ui_module.cc
+qianjs_module(canvas
+    CLASS CanvasPlugin
+    HEADER native/canvas/canvas_module.h
+    SOURCES
+        canvas/canvas_module.cc
+        canvas/canvas_color.cc
     REQUIRES UI_STACK
 )
 
-# Platform / frame loop (part of UI_STACK, not a JS plugin)
+qianjs_module(game
+    CLASS GamePlugin
+    HEADER native/game/game_module.h
+    SOURCES game/game_module.cc
+    DEPS canvas
+    REQUIRES GAME_STACK
+)
+
+# Platform drawing stack (not a JS plugin)
 set(QIANJS_UI_STACK_SOURCES
     platform/draw_list.cc
     platform/js_bridge.cc
-    platform/platform_window.cc
+    platform/platform_canvas.cc
+    platform/canvas_registry.cc
+)
+
+# Frame loop + input/render systems (not a JS plugin)
+set(QIANJS_GAME_STACK_SOURCES
     runtime/app_host.cc
     runtime/clock.cc
     runtime/frame_loop.cc
@@ -284,6 +305,15 @@ function(_qianjs_attach_ui_stack TARGET)
     set(_root "${CMAKE_SOURCE_DIR}/src")
     set(_paths "")
     foreach(_rel ${QIANJS_UI_STACK_SOURCES})
+        list(APPEND _paths "${_root}/${_rel}")
+    endforeach()
+    target_sources(${TARGET} PRIVATE ${_paths})
+endfunction()
+
+function(_qianjs_attach_game_stack TARGET)
+    set(_root "${CMAKE_SOURCE_DIR}/src")
+    set(_paths "")
+    foreach(_rel ${QIANJS_GAME_STACK_SOURCES})
         list(APPEND _paths "${_root}/${_rel}")
     endforeach()
     target_sources(${TARGET} PRIVATE ${_paths})

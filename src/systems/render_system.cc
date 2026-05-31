@@ -1,15 +1,15 @@
 #include "systems/render_system.h"
 
-#include "platform/platform_window.h"
+#include "platform/platform_canvas.h"
 
 namespace qianjs::systems {
 
-bool RenderSystem::render_frame(platform::PlatformWindow& win, qjs::Engine& engine, const qjs::Value& render_fn) {
-    win.draws().reset();
+bool RenderSystem::render_frame(platform::PlatformCanvas& canvas, qjs::Engine& engine, const qjs::Value& render_fn) {
+    canvas.draw_list().reset();
     if (!engine.call(render_fn).success) {
         return false;
     }
-    win.present();
+    canvas.present();
     return true;
 }
 

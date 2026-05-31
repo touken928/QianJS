@@ -8,20 +8,20 @@ cmake --build --preset=dev
 ctest --preset=dev --output-on-failure
 ```
 
-- **Submodules**: `qjs`, `libuv`, `uvw`, `sdl2` (UI).
+- **Submodules**: `qjs`, `libuv`, `uvw`, `sdl2` (window/events). **NanoVG** is vendored under `third_party/nanovg` (not a submodule yet).
 - **MSVC unsupported** — use MinGW-w64 or Clang on Windows.
 
 ## CMake / module profiles
 
 | Variable | Notes |
 |----------|-------|
-| `QIANJS_PROFILE` | **SKU**: `minimal` (console, process), `io` (+ timers, fs), `desktop` (+ ui). Empty/`custom` = use `QIANJS_MODULE_*` options. |
+| `QIANJS_PROFILE` | **SKU**: `minimal` (console, process), `io` (+ timers, fs), `desktop` (+ canvas, game). Empty/`custom` = use `QIANJS_MODULE_*` options. |
 | `QIANJS_MODULE_*` | Per-module override; catalog in [`src/native/native_modules.cmake`](src/native/native_modules.cmake). |
 | `QIANJS_BUILD_PROFILE` / `QIANJS_BUILD_MODULES` | Generated in `qianjs_modules.h` (observability, `help` text). |
 
 Presets `dev` / `test` / `prod` set `QIANJS_PROFILE=desktop`. `io` / `minimal` presets available for SKU CI.
 
-Module DAG: `ui` → UI_STACK (SDL + frame loop); `fs`|`timers` → libuv. Glue (`qianjs_default_plugins.g.cc`) registers plugins in topological order.
+Module DAG: `canvas` → UI_STACK (SDL + NanoVG); `game` → GAME_STACK (frame loop) + **DEPS** `canvas`; `fs`|`timers` → libuv. Glue (`qianjs_default_plugins.g.cc`) registers plugins in topological order.
 
 ## Architecture
 
@@ -32,7 +32,7 @@ qianjs_cli_run (src/app/cli.cc)
        └─ RuntimeInstance (one per process invocation)
        ├─ qjs::Engine + RuntimeContext (host)
        ├─ Scheduler (libuv loop, defer queue, uv_timer)
-       └─ PlatformWindow (optional, per instance)
+       └─ CanvasRegistry / PlatformCanvas (per createCanvas window)
 ```
 
 Native modules use `RuntimeInstance::current()` — **no** process-global `g_ui`, `g_timers`, or defer queue.
@@ -62,7 +62,7 @@ pump_async()      # uv tick + run_deferred
 pump_microtasks()
 ```
 
-### Game (`runApp` → `RuntimeInstance::run_frame_loop`)
+### Game (`game.run` → `RuntimeInstance::run_frame_loop`)
 
 Per frame:
 
@@ -71,26 +71,35 @@ Per frame:
 2. pump_async()     libuv + defer (timers, fs → JS)
 3. update(dt,input) logic
 4. pump_microtasks()
-5. render()         ui.* → DrawList
-6. present()        execute DrawList + SDL_RenderPresent
+5. render()         ctx.* → DrawList
+6. present()        NanoVG replay + SDL_GL_SwapWindow
 ```
 
 ## JS API
 
-```javascript
-import * as ui from 'ui';
+**`canvas`** — Web Canvas 2D subset (`createCanvas`, `getContext('2d')`, `setFillStyle`, paths, text, …). Each `createCanvas` opens its own SDL window.
 
-ui.runApp(ui.createApp({
+**`game`** — frame loop + keyboard (`game.run`, `game.isKeyDown`). Requires `canvas`.
+
+```javascript
+import * as canvas from 'canvas';
+import * as game from 'game';
+
+const cvs = canvas.createCanvas(480, 420, { title: 'Game' });
+const ctx = cvs.getContext('2d');
+
+game.run(cvs, {
   init() {},
   update(dt, input) {},
-  render() { ui.clear(0,0,0,1); /* ... */ },
+  render() {
+    ctx.setFillStyle('rgb(0,0,0)');
+    ctx.fillRect(0, 0, 480, 420);
+  },
   shutdown() {},
-}), { width: 480, height: 420, title: 'Game', maxFrames: 128, fps: 60, fixedStep: 1/60 });
+}, { maxFrames: 128, fps: 60, fixedStep: 1/60 });
 ```
 
-`ui.createApp` alone registers a deferred app; `Application::run_script` runs it after the script if `ui.runApp` was not called. Manual loop: `ui.init` → `pollEvents`/`readEvents` → draw → `present`. Pass a positive integer as the last `argv` entry to cap frames (same as examples).
-
-Headless UI (no SDL window): `QIANJS_NULL_UI=1` (DrawList still records; `present` clears without rendering).
+Headless: `QIANJS_NULL_UI=1` (record draw commands; `present` no-ops GL).
 
 ## Threading
 
@@ -122,7 +131,7 @@ Generic QuickJS C++ bindings — **not** libuv/SDL/QianJS lifecycle. QianJS link
 
 QuickJS C API is only used under `third_party/qjs/src/`.
 
-Host responsibilities stay in QianJS: script files (`Embed::readTextFile` + `evalModule`), libuv defer, timers/fs/ui plugins, `PromiseRegistry` on shutdown.
+Host responsibilities stay in QianJS: script files (`Embed::readTextFile` + `evalModule`), libuv defer, timers/fs/canvas/game plugins, `PromiseRegistry` on shutdown.
 
 ## Code layout
 

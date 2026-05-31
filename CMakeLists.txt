@@ -86,7 +86,8 @@ if(QIANJS_BUILD_CLI)
     endif()
     if(QIANJS_NATIVE_NEED_UI)
         include(cmake/ui.cmake)
-        target_link_libraries(qianjs_impl PRIVATE qianjs::ui_deps)
+        include(cmake/nanovg.cmake)
+        target_link_libraries(qianjs_impl PRIVATE qianjs::ui_deps qianjs::nanovg)
     endif()
 
     add_executable(qianjs

@@ -11,3 +11,6 @@
 [submodule "third_party/sdl2"]
 	path = third_party/sdl2
 	url = https://github.com/libsdl-org/SDL.git
+[submodule "third_party/nanovg"]
+	path = third_party/nanovg
+	url = https://github.com/memononen/nanovg.git

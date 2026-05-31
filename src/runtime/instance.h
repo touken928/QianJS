@@ -20,11 +20,14 @@
 
 namespace qianjs {
 
-#if QIANJS_MODULE_UI
 namespace platform {
-class PlatformWindow;
-}
+#if QIANJS_MODULE_CANVAS
+class CanvasRegistry;
 #endif
+#if QIANJS_MODULE_CANVAS || QIANJS_MODULE_GAME
+class PlatformCanvas;
+#endif
+}
 
 /**
  * Owns one script run: Engine, host context, scheduler, and lifecycle phase.
@@ -76,13 +79,15 @@ public:
     void track_promise(qjs::Promise* p);
     void untrack_promise(qjs::Promise* p);
 
-#if QIANJS_MODULE_UI
-    platform::PlatformWindow& ensure_window();
-    void destroy_window();
-    bool run_frame_loop(AppHost& app, const FrameLoopOptions& options);
+#if QIANJS_MODULE_CANVAS
+    platform::CanvasRegistry& canvases() { return *canvases_; }
+    const platform::CanvasRegistry& canvases() const { return *canvases_; }
+#endif
 
-    /** `createApp` without `runApp` — Application may run this after the script returns. */
-    void set_deferred_app(qjs::Value app_obj);
+#if QIANJS_MODULE_GAME
+    bool run_frame_loop(platform::PlatformCanvas& canvas, AppHost& app, const FrameLoopOptions& options);
+
+    void set_deferred_app(uint64_t canvas_id, qjs::Value app_obj);
     void clear_deferred_app();
     bool has_deferred_app() const { return has_deferred_app_; }
     bool try_run_deferred_app(const FrameLoopOptions& options = {});
@@ -101,8 +106,12 @@ private:
     LifecyclePhase phase_ = LifecyclePhase::Created;
     uint64_t generation_ = 0;
 
-#if QIANJS_MODULE_UI
-    std::unique_ptr<platform::PlatformWindow> window_;
+#if QIANJS_MODULE_CANVAS
+    std::unique_ptr<platform::CanvasRegistry> canvases_;
+#endif
+
+#if QIANJS_MODULE_GAME
+    uint64_t deferred_canvas_id_ = 0;
     AppHost deferred_app_;
     bool has_deferred_app_ = false;
 #endif
