@@ -110,7 +110,7 @@ qianjs embed dist/main.qbc        # 生成可独立运行的可执行文件副�
 说明：
 
 - `fs` / `timers` 关闭时不会链接 `libuv/uvw`（`QIANJS_HAVE_LIBUV=0`）。
-- `desktop` 需子模块 **`third_party/sdl2`** 与 **`third_party/nanovg`**；Linux 还需系统 OpenGL 开发包（如 Debian/Ubuntu：`libgl1-mesa-dev`）。无头/CI：`QIANJS_NULL_UI=1`，示例可传最大帧数如 `qianjs run examples/snake.js 64`。
+- `desktop` 需子模块 **`third_party/sdl2`** 与 **`third_party/nanovg`**；Linux 还需 OpenGL 与 X11 开发包（Debian/Ubuntu 示例：`libgl1-mesa-dev`、`libx11-dev`、`libxext-dev` 等，与 SDL2 X11 后端一致）。无头/CI：`QIANJS_NULL_UI=1`，示例可传最大帧数如 `qianjs run examples/snake.js 64`。
 - 生成头文件：`build/generated/qianjs_modules.h`（含 `QIANJS_BUILD_PROFILE`、`QIANJS_BUILD_MODULES`）、`qianjs_default_plugins.g.h`。
 - `qianjs help` 打印当前构建的 profile 与模块列表。
 
