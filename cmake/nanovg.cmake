@@ -31,6 +31,11 @@ elseif(WIN32)
 else()
     find_package(OpenGL REQUIRED)
     target_link_libraries(qianjs_nanovg PUBLIC OpenGL::GL)
+    # nanovg_backend.cc includes SDL_opengl.h (GL3); needs SDL2 include dirs.
+    if(NOT TARGET qianjs::ui_deps)
+        message(FATAL_ERROR "nanovg: include cmake/ui.cmake before nanovg.cmake on Linux")
+    endif()
+    target_link_libraries(qianjs_nanovg PRIVATE qianjs::ui_deps)
 endif()
 
 add_library(qianjs::nanovg ALIAS qianjs_nanovg)
