@@ -2,7 +2,7 @@
 
 #include "runtime/lifecycle.h"
 
-#include <js_engine.h>
+#include <qjs/engine.h>
 
 #include <atomic>
 #include <cstdint>
@@ -52,8 +52,8 @@ public:
     void tick() {}
 #endif
 
-    void defer(std::function<void(qjs::JSEngine&)> fn);
-    void run_deferred(qjs::JSEngine& engine);
+    void defer(std::function<void(qjs::Engine&)> fn);
+    void run_deferred(qjs::Engine& engine);
 
     void begin_operation();
     void end_operation();
@@ -63,17 +63,16 @@ public:
     bool has_pending_work() const;
 
     /** Returns false if new timers are not accepted (Draining/Shutdown). */
-    bool add_timer(JSContext* c, JSValue callback, int64_t delay_ms, bool repeat, int64_t& out_id);
+    bool add_timer(qjs::Value callback, int64_t delay_ms, bool repeat, int64_t& out_id);
     void cancel_timer(int64_t id);
 
     /** Stop timers, drop deferred queue; free timer callbacks on `engine` when ctx is valid. */
-    void shutdown(qjs::JSEngine& engine);
+    void shutdown(qjs::Engine& engine);
 
 private:
     struct TimerEntry;
 
-    void run_timer_callback(qjs::JSEngine& engine, const std::shared_ptr<TimerEntry>& entry);
-    void free_timer_callback(qjs::JSEngine& engine, const std::shared_ptr<TimerEntry>& entry);
+    void run_timer_callback(qjs::Engine& engine, const std::shared_ptr<TimerEntry>& entry);
 
 #if QIANJS_HAVE_LIBUV
     static void on_uv_timer(uv_timer_t* handle);
@@ -84,7 +83,7 @@ private:
     RuntimeInstance* owner_ = nullptr;
 
     mutable std::mutex defer_mu_;
-    std::vector<std::function<void(qjs::JSEngine&)>> defer_pending_;
+    std::vector<std::function<void(qjs::Engine&)>> defer_pending_;
 
     std::atomic<int> pending_ops_{0};
 

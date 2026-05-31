@@ -11,7 +11,7 @@
 
 TEST(NativeConsoleModule, LogInfoDebugGoToStdout) {
     qianjs::test::TestRuntime rt({"prog"}, {});
-    qjs::JSEngine& engine = rt.engine();
+    qjs::Engine& engine = rt.engine();
 
     std::stringstream cap;
     std::streambuf* prev = std::cout.rdbuf(cap.rdbuf());
@@ -37,7 +37,7 @@ debug('D');
 
 TEST(NativeConsoleModule, LogWithNoArgsWritesNewline) {
     qianjs::test::TestRuntime rt({"prog"}, {});
-    qjs::JSEngine& engine = rt.engine();
+    qjs::Engine& engine = rt.engine();
 
     std::stringstream cap;
     std::streambuf* prev = std::cout.rdbuf(cap.rdbuf());
@@ -57,7 +57,7 @@ log();
 
 TEST(NativeConsoleModule, WarnErrorGoToStderr) {
     qianjs::test::TestRuntime rt({"prog"}, {});
-    qjs::JSEngine& engine = rt.engine();
+    qjs::Engine& engine = rt.engine();
 
     std::stringstream cap;
     std::streambuf* prev = std::cerr.rdbuf(cap.rdbuf());

@@ -4,13 +4,11 @@
 
 namespace qianjs::systems {
 
-bool RenderSystem::render_frame(platform::PlatformWindow& win, JSContext* c, JSValue render_fn) {
+bool RenderSystem::render_frame(platform::PlatformWindow& win, qjs::Engine& engine, const qjs::Value& render_fn) {
     win.draws().reset();
-    JSValue r = JS_Call(c, render_fn, JS_UNDEFINED, 0, nullptr);
-    if (JS_IsException(r)) {
+    if (!engine.call(render_fn).success) {
         return false;
     }
-    JS_FreeValue(c, r);
     win.present();
     return true;
 }

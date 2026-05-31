@@ -1,7 +1,6 @@
 #pragma once
 
-#include <js_engine.h>
-#include <quickjs.h>
+#include <qjs/engine.h>
 
 #include "native/default_plugins.h"
 #include "runtime/instance.h"
@@ -25,42 +24,51 @@ struct TestRuntime {
         instance.begin_script_execution();
     }
 
-    qjs::JSEngine& engine() { return instance.engine(); }
+    qjs::Engine& engine() { return instance.engine(); }
     void drain() { instance.run_until_idle(); }
 };
 
-inline bool run_module(qjs::JSEngine& engine, const std::string& virtual_name, const std::string& code) {
-    return engine.runModuleCode(virtual_name, code);
+inline bool run_module(qjs::Engine& engine, const std::string& virtual_name, const std::string& code) {
+    return engine.evalModule(virtual_name, code).success;
 }
 
-inline std::string global_string(JSContext* c, const char* prop) {
-    JSValue g = JS_GetGlobalObject(c);
-    JSValue v = JS_GetPropertyStr(c, g, prop);
-    JS_FreeValue(c, g);
-    if (JS_IsUndefined(v) || JS_IsNull(v) || JS_IsUninitialized(v)) {
-        JS_FreeValue(c, v);
+inline std::string global_string(qjs::Engine& engine, const char* prop) {
+    auto v = engine.getGlobal(prop);
+    if (!v.success) {
         return {};
     }
-    const char* s = JS_ToCString(c, v);
-    std::string out = s ? s : "";
-    if (s) {
-        JS_FreeCString(c, s);
+    if (!v.value.valid() || v.value.isUndefined() || v.value.isNull()) {
+        return {};
     }
-    JS_FreeValue(c, v);
-    return out;
+    auto s = v.value.toString();
+    if (!s.success) {
+        return {};
+    }
+    if (s.value == "undefined") {
+        return {};
+    }
+    return s.value;
 }
 
-inline int global_int(JSContext* c, const char* prop, bool* ok = nullptr) {
-    JSValue g = JS_GetGlobalObject(c);
-    JSValue v = JS_GetPropertyStr(c, g, prop);
-    JS_FreeValue(c, g);
-    int32_t n = 0;
-    int r = JS_ToInt32(c, &n, v);
-    JS_FreeValue(c, v);
-    if (ok) {
-        *ok = (r == 0);
+inline int global_int(qjs::Engine& engine, const char* prop, bool* ok = nullptr) {
+    auto v = engine.getGlobal(prop);
+    if (!v.success) {
+        if (ok) {
+            *ok = false;
+        }
+        return 0;
     }
-    return static_cast<int>(n);
+    if (v.value.isUndefined() || v.value.isNull()) {
+        if (ok) {
+            *ok = false;
+        }
+        return 0;
+    }
+    auto n = v.value.toInt32();
+    if (ok) {
+        *ok = n.success;
+    }
+    return n.success ? static_cast<int>(n.value) : 0;
 }
 
 /** Double-quoted JS string literal (safe to embed in generated module source). */

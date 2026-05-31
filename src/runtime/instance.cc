@@ -1,5 +1,6 @@
 #include "runtime/instance.h"
 
+#include "runtime/embed.h"
 #include "runtime/plugin_lifecycle.h"
 
 #if QIANJS_MODULE_UI
@@ -53,9 +54,8 @@ void RuntimeInstance::initialize(const qjs::PluginRegistry& plugins) {
         return;
     }
 
-    engine_.initialize();
     engine_.setHost<RuntimeInstance>(this);
-    plugins.installAll(engine_, engine_.root());
+    plugins.installAll(engine_.context(), engine_.modules());
 
     scheduler_.set_phase(LifecyclePhase::Initialized);
     phase_ = LifecyclePhase::Initialized;
@@ -86,9 +86,9 @@ bool RuntimeInstance::run_frame_loop(AppHost& app, const FrameLoopOptions& optio
     return qianjs::run_frame_loop_impl(*this, app, options);
 }
 
-void RuntimeInstance::set_deferred_app(JSContext* c, JSValue app_obj) {
+void RuntimeInstance::set_deferred_app(qjs::Value app_obj) {
     clear_deferred_app();
-    if (!deferred_app_.load_from_object(c, app_obj)) {
+    if (!deferred_app_.load_from_object(std::move(app_obj))) {
         return;
     }
     has_deferred_app_ = deferred_app_.has_hooks();
@@ -98,7 +98,7 @@ void RuntimeInstance::clear_deferred_app() {
     if (!has_deferred_app_) {
         return;
     }
-    deferred_app_.release(engine_.ctx());
+    deferred_app_.release();
     has_deferred_app_ = false;
 }
 
@@ -113,19 +113,24 @@ bool RuntimeInstance::try_run_deferred_app(const FrameLoopOptions& options) {
 
 #endif
 
-qjs::JSEngine::PromiseHandle RuntimeInstance::create_promise() {
-    qjs::JSEngine::PromiseHandle h = engine_.createPromise();
-    promises_.track(h);
-    return h;
+std::unique_ptr<qjs::Promise> RuntimeInstance::create_promise() {
+    auto p = engine_.createPromise();
+    if (p) {
+        promises_.track(p.get());
+    }
+    return p;
 }
 
-void RuntimeInstance::release_promise(qjs::JSEngine::PromiseHandle h) {
-    promises_.untrack(h);
-    engine_.freePromise(h);
+void RuntimeInstance::track_promise(qjs::Promise* p) {
+    promises_.track(p);
+}
+
+void RuntimeInstance::untrack_promise(qjs::Promise* p) {
+    promises_.untrack(p);
 }
 
 void RuntimeInstance::reject_pending_promises() {
-    promises_.reject_all(engine_, "Runtime shut down", "ESHUTDOWN");
+    promises_.reject_all("Runtime shut down", "ESHUTDOWN");
 }
 
 void RuntimeInstance::shutdown() {
@@ -147,7 +152,6 @@ void RuntimeInstance::shutdown() {
     phase_ = LifecyclePhase::Shutdown;
     scheduler_.shutdown(engine_);
 
-    engine_.cleanup();
     phase_ = LifecyclePhase::Destroyed;
 }
 
@@ -155,8 +159,12 @@ bool RuntimeInstance::run_file(const std::filesystem::path& path) {
     if (phase_ != LifecyclePhase::Initialized) {
         return false;
     }
+    const std::string code = Embed::readTextFile(path);
+    if (code.empty()) {
+        return false;
+    }
     begin_script_execution();
-    const bool ok = engine_.runFile(path.string());
+    const bool ok = engine_.evalModule(path.string(), code).success;
     if (!ok) {
         enter_draining();
         run_until_idle(std::chrono::seconds(5));
@@ -169,7 +177,7 @@ bool RuntimeInstance::run_bytecode(const uint8_t* data, size_t len) {
         return false;
     }
     begin_script_execution();
-    const bool ok = engine_.runBytecode(data, len);
+    const bool ok = engine_.runBytecode(data, len).success;
     if (!ok) {
         enter_draining();
         run_until_idle(std::chrono::seconds(5));

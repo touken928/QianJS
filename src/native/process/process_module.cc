@@ -3,12 +3,12 @@
 #include "runtime/instance.h"
 #include "runtime/runtime_context.h"
 
-#include <js_engine.h>
-#include <js_module.h>
-#include <js_types.h>
-#include <quickjs.h>
+#include <qjs/call.h>
+#include <qjs/engine.h>
+#include <qjs/module.h>
 
 #include <filesystem>
+#include <functional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -57,95 +57,61 @@ qianjs::RuntimeContext* current_host() {
     return nullptr;
 }
 
-JSValue argv_to_js(JSContext* c, const std::vector<std::string>& argv) {
-    JSValue arr = JS_NewArray(c);
-    if (JS_IsException(arr)) {
-        return arr;
-    }
-    for (uint32_t i = 0; i < argv.size(); i++) {
-        JSValue s = JS_NewString(c, argv[i].c_str());
-        if (JS_IsException(s) || JS_SetPropertyUint32(c, arr, i, s) < 0) {
-            JS_FreeValue(c, arr);
-            return JS_EXCEPTION;
-        }
-    }
-    return arr;
-}
-
-JSValue env_to_js(JSContext* c, const std::vector<std::pair<std::string, std::string>>& env) {
-    JSValue obj = JS_NewObject(c);
-    if (JS_IsException(obj)) {
-        return obj;
-    }
-    for (const auto& kv : env) {
-        JSValue v = JS_NewString(c, kv.second.c_str());
-        if (JS_IsException(v) || JS_SetPropertyStr(c, obj, kv.first.c_str(), v) < 0) {
-            JS_FreeValue(c, obj);
-            return JS_EXCEPTION;
-        }
-    }
-    return obj;
-}
-
 } // namespace
 
 const char* ProcessPlugin::name() const {
     return "process";
 }
 
-void ProcessPlugin::install(qjs::JSEngine& engine, qjs::JSModule& root) {
-    (void)engine;
+void ProcessPlugin::install(qjs::Context&, qjs::Module& root) {
     auto& m = root.module("process");
 
-    m.funcDynamic("pid", 0, 0, [](JSContext* c, int argc, JSValue* argv) -> JSValue {
-        (void)argc;
-        (void)argv;
-        return JS_NewInt32(c, current_pid());
+    m.funcDynamic("pid", 0, 0, [](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
+        return qjs::Result<qjs::Value>::ok(ctx.engine().int64(current_pid()));
     });
 
-    m.funcDynamic("platform", 0, 0, [](JSContext* c, int argc, JSValue* argv) -> JSValue {
-        (void)argc;
-        (void)argv;
-        return JS_NewString(c, platform_id());
+    m.funcDynamic("platform", 0, 0, [](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
+        return qjs::Result<qjs::Value>::ok(ctx.engine().string(platform_id()));
     });
 
-    m.funcDynamic("cwd", 0, 0, [](JSContext* c, int argc, JSValue* argv) -> JSValue {
-        (void)argc;
-        (void)argv;
-        std::string path = current_working_directory();
-        return JS_NewString(c, path.c_str());
+    m.funcDynamic("cwd", 0, 0, [](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
+        return qjs::Result<qjs::Value>::ok(ctx.engine().string(current_working_directory()));
     });
 
-    m.funcDynamic("argv", 0, 0, [](JSContext* c, int argc, JSValue* argv) -> JSValue {
-        (void)argc;
-        (void)argv;
+    m.funcDynamic("argv", 0, 0, [](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
         qianjs::RuntimeContext* runtime = current_host();
-        if (!runtime) {
-            return JS_NewArray(c);
-        }
-        return argv_to_js(c, runtime->argv);
-    });
-
-    m.funcDynamic("env", 0, 1, [](JSContext* c, int argc, JSValue* argv) -> JSValue {
-        qianjs::RuntimeContext* runtime = current_host();
-        if (!runtime) {
-            return JS_UNDEFINED;
-        }
-        if (argc == 0) {
-            return env_to_js(c, runtime->env);
-        }
-
-        bool ok = false;
-        std::string key = qjs::JSConv<std::string>::from(c, argv[0], ok);
-        if (!ok) {
-            return JS_EXCEPTION;
-        }
-        for (const auto& kv : runtime->env) {
-            if (kv.first == key) {
-                return JS_NewString(c, kv.second.c_str());
+        auto arr = ctx.engine().array();
+        if (runtime) {
+            for (const std::string& s : runtime->argv) {
+                arr.pushString(s);
             }
         }
-        return JS_UNDEFINED;
+        return qjs::Result<qjs::Value>::ok(arr.build());
+    });
+
+    m.funcDynamic("env", 0, 1, [](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
+        qianjs::RuntimeContext* runtime = current_host();
+        if (!runtime) {
+            return qjs::Result<qjs::Value>::ok(ctx.undefined());
+        }
+        if (ctx.argc() == 0) {
+            auto obj = ctx.engine().object();
+            for (const auto& kv : runtime->env) {
+                obj.setString(kv.first, kv.second);
+            }
+            return qjs::Result<qjs::Value>::ok(obj.build());
+        }
+
+        auto key = ctx.stringArg(0);
+        if (!key.success) {
+            return qjs::Result<qjs::Value>::fail(key.error);
+        }
+        for (const auto& kv : runtime->env) {
+            if (kv.first == key.value) {
+                return qjs::Result<qjs::Value>::ok(ctx.engine().string(kv.second));
+            }
+        }
+        return qjs::Result<qjs::Value>::ok(ctx.undefined());
     });
 
     m.func("getExitCode", []() -> int {
@@ -158,9 +124,9 @@ void ProcessPlugin::install(qjs::JSEngine& engine, qjs::JSModule& root) {
         return runtime ? runtime->exit_code : 0;
     });
 
-    m.func("setExitCode", [](int code) {
+    m.func("setExitCode", std::function<void(int)>([](int code) {
         if (qianjs::RuntimeContext* runtime = current_host()) {
             runtime->exit_code = code;
         }
-    });
+    }));
 }

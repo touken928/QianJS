@@ -1,7 +1,7 @@
 #pragma once
 
 namespace qjs {
-class JSModule;
+class Module;
 }
 
-void install_fs_sync(qjs::JSModule& sync);
+void install_fs_sync(qjs::Module& sync);

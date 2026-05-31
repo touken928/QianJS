@@ -8,8 +8,8 @@
 
 #include <qianjs_modules.h>
 
-#include <js_engine.h>
-#include <js_plugin.h>
+#include <qjs/engine.h>
+#include <qjs/plugin.h>
 
 #include <chrono>
 #include <cstdint>
@@ -27,7 +27,7 @@ class PlatformWindow;
 #endif
 
 /**
- * Owns one script run: JSEngine, host context, scheduler, and lifecycle phase.
+ * Owns one script run: Engine, host context, scheduler, and lifecycle phase.
  * All native async work (timers, fs defer) must run while this instance is active().
  */
 class RuntimeInstance {
@@ -41,8 +41,8 @@ public:
     void initialize(const qjs::PluginRegistry& plugins);
     void shutdown();
 
-    qjs::JSEngine& engine() { return engine_; }
-    const qjs::JSEngine& engine() const { return engine_; }
+    qjs::Engine& engine() { return engine_; }
+    const qjs::Engine& engine() const { return engine_; }
     RuntimeContext& host() { return host_; }
     const RuntimeContext& host() const { return host_; }
     Scheduler& scheduler() { return scheduler_; }
@@ -72,8 +72,9 @@ public:
 
     void enter_draining();
 
-    qjs::JSEngine::PromiseHandle create_promise();
-    void release_promise(qjs::JSEngine::PromiseHandle h);
+    std::unique_ptr<qjs::Promise> create_promise();
+    void track_promise(qjs::Promise* p);
+    void untrack_promise(qjs::Promise* p);
 
 #if QIANJS_MODULE_UI
     platform::PlatformWindow& ensure_window();
@@ -81,7 +82,7 @@ public:
     bool run_frame_loop(AppHost& app, const FrameLoopOptions& options);
 
     /** `createApp` without `runApp` — Application may run this after the script returns. */
-    void set_deferred_app(JSContext* c, JSValue app_obj);
+    void set_deferred_app(qjs::Value app_obj);
     void clear_deferred_app();
     bool has_deferred_app() const { return has_deferred_app_; }
     bool try_run_deferred_app(const FrameLoopOptions& options = {});
@@ -93,7 +94,7 @@ private:
     bool is_idle() const;
     void reject_pending_promises();
 
-    qjs::JSEngine engine_;
+    qjs::Engine engine_;
     RuntimeContext host_;
     Scheduler scheduler_;
     PromiseRegistry promises_;

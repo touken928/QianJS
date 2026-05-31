@@ -11,7 +11,7 @@
 #include "systems/input_system.h"
 #include "systems/render_system.h"
 
-#include <js_engine.h>
+#include <qjs/engine.h>
 
 #include <iostream>
 #include <thread>
@@ -21,41 +21,15 @@ namespace qianjs {
 
 namespace {
 
-bool call_void(JSContext* c, JSValue fn) {
-    if (JS_IsUndefined(fn)) {
+bool call_void(qjs::Engine& engine, const qjs::Value& fn) {
+    if (!fn.isFunction()) {
         return true;
     }
-    JSValue r = JS_Call(c, fn, JS_UNDEFINED, 0, nullptr);
-    if (JS_IsException(r)) {
-        return false;
-    }
-    JS_FreeValue(c, r);
-    return true;
+    return engine.call(fn).success;
 }
 
-bool call_update(JSContext* c, JSValue fn, double dt, JSValue input) {
-    JSValue args[2] = {JS_NewFloat64(c, dt), input};
-    if (JS_IsException(args[0])) {
-        return false;
-    }
-    JSValue r = JS_Call(c, fn, JS_UNDEFINED, 2, args);
-    JS_FreeValue(c, args[0]);
-    if (JS_IsException(r)) {
-        return false;
-    }
-    JS_FreeValue(c, r);
-    return true;
-}
-
-void dump_exception(qjs::JSEngine& engine) {
-    JSContext* c = engine.ctx();
-    JSValue exc = JS_GetException(c);
-    const char* msg = JS_ToCString(c, exc);
-    if (msg) {
-        std::cerr << "app error: " << msg << '\n';
-        JS_FreeCString(c, msg);
-    }
-    JS_FreeValue(c, exc);
+bool call_update(qjs::Engine& engine, const qjs::Value& fn, double dt, const qjs::Value& input) {
+    return engine.call(fn, engine.float64(dt), input).success;
 }
 
 } // namespace
@@ -71,15 +45,14 @@ bool run_frame_loop_impl(RuntimeInstance& instance, AppHost& app, const FrameLoo
         return false;
     }
 
-    qjs::JSEngine& engine = instance.engine();
-    JSContext* c = engine.ctx();
+    qjs::Engine& engine = instance.engine();
     if (!instance.is_running()) {
         instance.begin_script_execution();
     }
 
-    if (!JS_IsUndefined(app.init_fn()) && !call_void(c, app.init_fn())) {
-        dump_exception(engine);
-        app.release(c);
+    if (app.init_fn().isFunction() && !call_void(engine, app.init_fn())) {
+        std::cerr << "app init error\n";
+        app.release();
         return false;
     }
     instance.pump_microtasks();
@@ -119,9 +92,9 @@ bool run_frame_loop_impl(RuntimeInstance& instance, AppHost& app, const FrameLoo
         instance.pump_async();
 
         systems::InputFrame input_frame{frame, real_dt, clock.alpha()};
-        JSValue input = input_sys.build_input_object(c, batch, input_frame);
-        if (JS_IsException(input)) {
-            dump_exception(engine);
+        qjs::Value input = input_sys.build_input_object(engine, batch, input_frame);
+        if (!input.valid()) {
+            std::cerr << "app input build error\n";
             running = false;
             break;
         }
@@ -129,27 +102,25 @@ bool run_frame_loop_impl(RuntimeInstance& instance, AppHost& app, const FrameLoo
         const int fixed_steps = clock.consume_fixed_steps();
         if (fixed_steps > 0) {
             for (int s = 0; s < fixed_steps; ++s) {
-                if (!call_update(c, app.update_fn(), clock.fixed_dt(), input)) {
-                    dump_exception(engine);
+                if (!call_update(engine, app.update_fn(), clock.fixed_dt(), input)) {
+                    std::cerr << "app update error\n";
                     running = false;
                     break;
                 }
                 instance.pump_microtasks();
             }
-        } else if (!call_update(c, app.update_fn(), real_dt, input)) {
-            dump_exception(engine);
+        } else if (!call_update(engine, app.update_fn(), real_dt, input)) {
+            std::cerr << "app update error\n";
             running = false;
         }
 
         if (running) {
             instance.pump_microtasks();
-            if (!render_sys.render_frame(win, c, app.render_fn())) {
-                dump_exception(engine);
+            if (!render_sys.render_frame(win, engine, app.render_fn())) {
+                std::cerr << "app render error\n";
                 running = false;
             }
         }
-
-        JS_FreeValue(c, input);
 
         ++frame;
         if (options.max_frames > 0 && frame >= options.max_frames) {
@@ -157,14 +128,14 @@ bool run_frame_loop_impl(RuntimeInstance& instance, AppHost& app, const FrameLoo
         }
     }
 
-    if (!JS_IsUndefined(app.shutdown_fn())) {
-        if (!call_void(c, app.shutdown_fn())) {
-            dump_exception(engine);
+    if (app.shutdown_fn().isFunction()) {
+        if (!call_void(engine, app.shutdown_fn())) {
+            std::cerr << "app shutdown error\n";
         }
         instance.pump_once();
     }
 
-    app.release(c);
+    app.release();
     instance.enter_draining();
     return true;
 }

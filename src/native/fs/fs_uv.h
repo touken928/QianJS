@@ -1,20 +1,24 @@
 #pragma once
 
-#include <js_engine.h>
+#include <qjs/value.h>
 
 #include <string>
 #include <vector>
 
-qjs::RawJSValue fsReadFileAsync(qjs::JSEngine& engine, std::string path, bool asBuffer);
+namespace qjs {
+class Engine;
+}
 
-qjs::RawJSValue fsWriteFileAsync(qjs::JSEngine& engine, std::string path, std::vector<uint8_t> data);
+qjs::Value fsReadFileAsync(qjs::Engine& engine, std::string path, bool asBuffer);
 
-qjs::RawJSValue fsMkdirAsync(qjs::JSEngine& engine, std::string path, bool recursive);
+qjs::Value fsWriteFileAsync(qjs::Engine& engine, std::string path, std::vector<uint8_t> data);
 
-qjs::RawJSValue fsReaddirAsync(qjs::JSEngine& engine, std::string path);
+qjs::Value fsMkdirAsync(qjs::Engine& engine, std::string path, bool recursive);
 
-qjs::RawJSValue fsStatAsync(qjs::JSEngine& engine, std::string path);
+qjs::Value fsReaddirAsync(qjs::Engine& engine, std::string path);
 
-qjs::RawJSValue fsUnlinkAsync(qjs::JSEngine& engine, std::string path);
+qjs::Value fsStatAsync(qjs::Engine& engine, std::string path);
 
-qjs::RawJSValue fsRmdirAsync(qjs::JSEngine& engine, std::string path);
+qjs::Value fsUnlinkAsync(qjs::Engine& engine, std::string path);
+
+qjs::Value fsRmdirAsync(qjs::Engine& engine, std::string path);

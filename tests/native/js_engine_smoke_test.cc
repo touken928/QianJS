@@ -1,9 +1,8 @@
 #include <gtest/gtest.h>
 
-#include <js_engine.h>
+#include <qjs/engine.h>
 
-/** Minimal JS engine lifecycle check (no native plugins). */
-TEST(NativeJsEngineSmoke, InitializesAndCleansUp) {
-    qjs::JSEngine engine;
-    engine.initialize();
+TEST(JsEngineSmoke, ConstructAndEvalModule) {
+    qjs::Engine engine;
+    EXPECT_TRUE(engine.evalModule("m.js", "export {};\n").success);
 }

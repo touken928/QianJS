@@ -1,5 +1,7 @@
 #include "native/fs/fs_stat_js.h"
 
+#include <qjs/object.h>
+
 #include <cstdint>
 
 #include <sys/stat.h>
@@ -8,19 +10,7 @@ static int64_t timespec_to_ms(const uv_timespec_t& t) {
     return static_cast<int64_t>(t.tv_sec) * 1000 + static_cast<int64_t>(t.tv_nsec) / 1000000;
 }
 
-JSValue fs_stat_to_js(JSContext* c, const uv_stat_t& st) {
-    JSValue o = JS_NewObject(c);
-    if (JS_IsException(o))
-        return o;
-
-    auto def = [&](const char* name, JSValue v) {
-        if (JS_IsException(v) || JS_DefinePropertyValueStr(c, o, name, v, JS_PROP_C_W_E) < 0) {
-            JS_FreeValue(c, o);
-            return false;
-        }
-        return true;
-    };
-
+qjs::Value fs_stat_to_value(qjs::Engine& engine, const uv_stat_t& st) {
 #ifndef S_IFMT
 #define S_IFMT 0170000
 #endif
@@ -55,29 +45,27 @@ JSValue fs_stat_to_js(JSContext* c, const uv_stat_t& st) {
     const bool is_fifo = (mode & S_IFMT) == S_IFIFO;
     const bool is_sock = (mode & S_IFMT) == S_IFSOCK;
 
-    if (!def("dev", JS_NewInt64(c, static_cast<int64_t>(st.st_dev)))
-        || !def("ino", JS_NewInt64(c, static_cast<int64_t>(st.st_ino)))
-        || !def("mode", JS_NewInt64(c, static_cast<int64_t>(st.st_mode)))
-        || !def("nlink", JS_NewInt64(c, static_cast<int64_t>(st.st_nlink)))
-        || !def("uid", JS_NewInt64(c, static_cast<int64_t>(st.st_uid)))
-        || !def("gid", JS_NewInt64(c, static_cast<int64_t>(st.st_gid)))
-        || !def("rdev", JS_NewInt64(c, static_cast<int64_t>(st.st_rdev)))
-        || !def("size", JS_NewInt64(c, static_cast<int64_t>(st.st_size)))
-        || !def("blksize", JS_NewInt64(c, static_cast<int64_t>(st.st_blksize)))
-        || !def("blocks", JS_NewInt64(c, static_cast<int64_t>(st.st_blocks)))
-        || !def("atimeMs", JS_NewFloat64(c, static_cast<double>(timespec_to_ms(st.st_atim))))
-        || !def("mtimeMs", JS_NewFloat64(c, static_cast<double>(timespec_to_ms(st.st_mtim))))
-        || !def("ctimeMs", JS_NewFloat64(c, static_cast<double>(timespec_to_ms(st.st_ctim))))
-        || !def("birthtimeMs", JS_NewFloat64(c, static_cast<double>(timespec_to_ms(st.st_birthtim))))
-        || !def("isFile", JS_NewBool(c, is_file))
-        || !def("isDirectory", JS_NewBool(c, is_dir))
-        || !def("isSymbolicLink", JS_NewBool(c, is_symlink))
-        || !def("isCharacterDevice", JS_NewBool(c, is_chr))
-        || !def("isBlockDevice", JS_NewBool(c, is_blk))
-        || !def("isFIFO", JS_NewBool(c, is_fifo))
-        || !def("isSocket", JS_NewBool(c, is_sock))) {
-        return JS_EXCEPTION;
-    }
-
-    return o;
+    return engine.object()
+        .setInt64("dev", static_cast<int64_t>(st.st_dev))
+        .setInt64("ino", static_cast<int64_t>(st.st_ino))
+        .setInt64("mode", static_cast<int64_t>(st.st_mode))
+        .setInt64("nlink", static_cast<int64_t>(st.st_nlink))
+        .setInt64("uid", static_cast<int64_t>(st.st_uid))
+        .setInt64("gid", static_cast<int64_t>(st.st_gid))
+        .setInt64("rdev", static_cast<int64_t>(st.st_rdev))
+        .setInt64("size", static_cast<int64_t>(st.st_size))
+        .setInt64("blksize", static_cast<int64_t>(st.st_blksize))
+        .setInt64("blocks", static_cast<int64_t>(st.st_blocks))
+        .setDouble("atimeMs", static_cast<double>(timespec_to_ms(st.st_atim)))
+        .setDouble("mtimeMs", static_cast<double>(timespec_to_ms(st.st_mtim)))
+        .setDouble("ctimeMs", static_cast<double>(timespec_to_ms(st.st_ctim)))
+        .setDouble("birthtimeMs", static_cast<double>(timespec_to_ms(st.st_birthtim)))
+        .setBool("isFile", is_file)
+        .setBool("isDirectory", is_dir)
+        .setBool("isSymbolicLink", is_symlink)
+        .setBool("isCharacterDevice", is_chr)
+        .setBool("isBlockDevice", is_blk)
+        .setBool("isFIFO", is_fifo)
+        .setBool("isSocket", is_sock)
+        .build();
 }

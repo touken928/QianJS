@@ -1,9 +1,9 @@
 #pragma once
 
-#include <js_plugin.h>
+#include <qjs/plugin.h>
 
-class ProcessPlugin final : public qjs::IEnginePlugin {
+class ProcessPlugin final : public qjs::IPlugin {
 public:
     const char* name() const override;
-    void install(qjs::JSEngine& engine, qjs::JSModule& root) override;
+    void install(qjs::Context& ctx, qjs::Module& root) override;
 };

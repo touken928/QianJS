@@ -20,53 +20,41 @@ using qianjs::fs::schedule::reject;
 using qianjs::fs::schedule::resolve_void;
 using qianjs::promise::release;
 
-void schedule_resolve_string_array(qjs::JSEngine::PromiseHandle ph, std::vector<std::string> names) {
+void schedule_resolve_string_array(std::shared_ptr<qjs::Promise> ph, std::vector<std::string> names) {
     qianjs::event_loop::defer(
-        [ph, names = std::move(names)](qjs::JSEngine& e) {
-            JSContext* c = e.ctx();
-            JSValue arr = JS_NewArray(c);
-            if (JS_IsException(arr)) {
-                e.rejectPromise(ph, "failed to allocate array");
-                release(e, ph);
+        [ph, names = std::move(names)](qjs::Engine& engine) {
+            if (!ph) {
                 return;
             }
-            for (uint32_t i = 0; i < names.size(); i++) {
-                JSValue s = JS_NewString(c, names[i].c_str());
-                if (JS_IsException(s) || JS_SetPropertyUint32(c, arr, i, s) < 0) {
-                    JS_FreeValue(c, arr);
-                    e.rejectPromise(ph, "failed to build readdir result");
-                    release(e, ph);
-                    return;
-                }
+            auto arr = engine.array();
+            for (const auto& n : names) {
+                arr.pushString(n);
             }
-            e.resolvePromiseJSValue(ph, arr);
-            release(e, ph);
+            ph->resolve(arr.build());
+            release(ph.get());
         });
 }
 
-void schedule_resolve_stat(qjs::JSEngine::PromiseHandle ph, const uv_stat_t& st) {
-    qianjs::event_loop::defer([ph, st](qjs::JSEngine& e) {
-        JSContext* c = e.ctx();
-        JSValue o = fs_stat_to_js(c, st);
-        if (JS_IsException(o)) {
-            e.rejectPromise(ph, "failed to build stat object");
-            release(e, ph);
+void schedule_resolve_stat(std::shared_ptr<qjs::Promise> ph, const uv_stat_t& st) {
+    qianjs::event_loop::defer([ph, st](qjs::Engine& engine) {
+        if (!ph) {
             return;
         }
-        e.resolvePromiseJSValue(ph, o);
-        release(e, ph);
+        ph->resolve(fs_stat_to_value(engine, st));
+        release(ph.get());
     });
 }
 
 } // namespace
 
-qjs::RawJSValue fsReaddirAsync(qjs::JSEngine& engine, std::string path) {
-    qjs::JSEngine::PromiseHandle ph = qianjs::promise::create(engine);
-    if (!ph.ptr)
-        return engine.promiseValue(ph);
+qjs::Value fsReaddirAsync(qjs::Engine& engine, std::string path) {
+    auto ph = qianjs::promise::create_shared(engine);
+    if (!ph) {
+        return {};
+    }
 
     struct Ctx {
-        qjs::JSEngine::PromiseHandle ph{};
+        std::shared_ptr<qjs::Promise> ph{};
         std::shared_ptr<uvw::fs_req> req_keep;
         std::vector<std::string> names;
     };
@@ -81,7 +69,7 @@ qjs::RawJSValue fsReaddirAsync(qjs::JSEngine& engine, std::string path) {
     req->on<uvw::error_event>([ctx](const uvw::error_event& e, auto&) {
         qianjs::event_loop::end_operation();
         reject(ctx->ph, e.what());
-        qianjs::event_loop::defer([ctx](qjs::JSEngine&) { ctx->req_keep.reset(); });
+        qianjs::event_loop::defer([ctx](qjs::Engine&) { ctx->req_keep.reset(); });
     });
 
     req->on<uvw::fs_event>([ctx](const uvw::fs_event& ev, uvw::fs_req& r) {
@@ -102,7 +90,7 @@ qjs::RawJSValue fsReaddirAsync(qjs::JSEngine& engine, std::string path) {
         case ft::CLOSEDIR:
             qianjs::event_loop::end_operation();
             schedule_resolve_string_array(ctx->ph, std::move(ctx->names));
-            qianjs::event_loop::defer([ctx](qjs::JSEngine&) { ctx->req_keep.reset(); });
+            qianjs::event_loop::defer([ctx](qjs::Engine&) { ctx->req_keep.reset(); });
             break;
         default:
             break;
@@ -111,16 +99,17 @@ qjs::RawJSValue fsReaddirAsync(qjs::JSEngine& engine, std::string path) {
 
     qianjs::event_loop::begin_operation();
     req->opendir(path);
-    return engine.promiseValue(ph);
+    return ph->toValue();
 }
 
-qjs::RawJSValue fsStatAsync(qjs::JSEngine& engine, std::string path) {
-    qjs::JSEngine::PromiseHandle ph = qianjs::promise::create(engine);
-    if (!ph.ptr)
-        return engine.promiseValue(ph);
+qjs::Value fsStatAsync(qjs::Engine& engine, std::string path) {
+    auto ph = qianjs::promise::create_shared(engine);
+    if (!ph) {
+        return {};
+    }
 
     struct Ctx {
-        qjs::JSEngine::PromiseHandle ph{};
+        std::shared_ptr<qjs::Promise> ph{};
         std::shared_ptr<uvw::fs_req> req_keep;
     };
     auto ctx = std::make_shared<Ctx>();
@@ -134,30 +123,31 @@ qjs::RawJSValue fsStatAsync(qjs::JSEngine& engine, std::string path) {
     req->on<uvw::error_event>([ctx](const uvw::error_event& e, auto&) {
         qianjs::event_loop::end_operation();
         reject(ctx->ph, e.what());
-        qianjs::event_loop::defer([ctx](qjs::JSEngine&) { ctx->req_keep.reset(); });
+        qianjs::event_loop::defer([ctx](qjs::Engine&) { ctx->req_keep.reset(); });
     });
 
     req->on<uvw::fs_event>([ctx](const uvw::fs_event& ev, uvw::fs_req&) {
         if (ev.type == ft::STAT || ev.type == ft::LSTAT) {
             qianjs::event_loop::end_operation();
             schedule_resolve_stat(ctx->ph, ev.stat);
-            qianjs::event_loop::defer([ctx](qjs::JSEngine&) { ctx->req_keep.reset(); });
+            qianjs::event_loop::defer([ctx](qjs::Engine&) { ctx->req_keep.reset(); });
         }
     });
 
     qianjs::event_loop::begin_operation();
     req->stat(path);
-    return engine.promiseValue(ph);
+    return ph->toValue();
 }
 
-static qjs::RawJSValue fs_one_path_void(qjs::JSEngine& engine, std::string path,
+static qjs::Value fs_one_path_void(qjs::Engine& engine, std::string path,
     void (*start)(uvw::fs_req&, const std::string&), uvw::fs_req::fs_type doneType) {
-    qjs::JSEngine::PromiseHandle ph = qianjs::promise::create(engine);
-    if (!ph.ptr)
-        return engine.promiseValue(ph);
+    auto ph = qianjs::promise::create_shared(engine);
+    if (!ph) {
+        return {};
+    }
 
     struct Ctx {
-        qjs::JSEngine::PromiseHandle ph{};
+        std::shared_ptr<qjs::Promise> ph{};
         std::shared_ptr<uvw::fs_req> req_keep;
     };
     auto ctx = std::make_shared<Ctx>();
@@ -169,29 +159,28 @@ static qjs::RawJSValue fs_one_path_void(qjs::JSEngine& engine, std::string path,
     req->on<uvw::error_event>([ctx](const uvw::error_event& e, auto&) {
         qianjs::event_loop::end_operation();
         reject(ctx->ph, e.what());
-        qianjs::event_loop::defer([ctx](qjs::JSEngine&) { ctx->req_keep.reset(); });
+        qianjs::event_loop::defer([ctx](qjs::Engine&) { ctx->req_keep.reset(); });
     });
 
     req->on<uvw::fs_event>([ctx, doneType](const uvw::fs_event& ev, uvw::fs_req&) {
         if (ev.type == doneType) {
             qianjs::event_loop::end_operation();
             resolve_void(ctx->ph);
-            qianjs::event_loop::defer([ctx](qjs::JSEngine&) { ctx->req_keep.reset(); });
+            qianjs::event_loop::defer([ctx](qjs::Engine&) { ctx->req_keep.reset(); });
         }
     });
 
     qianjs::event_loop::begin_operation();
     start(*req, path);
-    return engine.promiseValue(ph);
+    return ph->toValue();
 }
 
-qjs::RawJSValue fsUnlinkAsync(qjs::JSEngine& engine, std::string path) {
+qjs::Value fsUnlinkAsync(qjs::Engine& engine, std::string path) {
     return fs_one_path_void(
         engine, std::move(path), [](uvw::fs_req& r, const std::string& p) { r.unlink(p); }, uvw::fs_req::fs_type::UNLINK);
 }
 
-qjs::RawJSValue fsRmdirAsync(qjs::JSEngine& engine, std::string path) {
+qjs::Value fsRmdirAsync(qjs::Engine& engine, std::string path) {
     return fs_one_path_void(
         engine, std::move(path), [](uvw::fs_req& r, const std::string& p) { r.rmdir(p); }, uvw::fs_req::fs_type::RMDIR);
 }
-

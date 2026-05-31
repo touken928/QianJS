@@ -1,6 +1,7 @@
 #pragma once
 
-#include <quickjs.h>
+#include <qjs/engine.h>
+#include <qjs/value.h>
 
 #include <SDL.h>
 
@@ -23,7 +24,7 @@ struct InputFrame {
 class InputSystem {
 public:
     bool poll(platform::PlatformWindow& win, std::vector<SDL_Event>& batch, bool& should_quit);
-    JSValue build_input_object(JSContext* c, const std::vector<SDL_Event>& batch, const InputFrame& frame) const;
+    qjs::Value build_input_object(qjs::Engine& engine, const std::vector<SDL_Event>& batch, const InputFrame& frame) const;
 };
 
 } // namespace qianjs::systems

@@ -54,14 +54,14 @@ void tick() {
     }
 }
 
-void defer(std::function<void(qjs::JSEngine&)> fn) {
+void defer(std::function<void(qjs::Engine&)> fn) {
     if (Scheduler* s = active_scheduler()) {
         s->defer(std::move(fn));
         return;
     }
 }
 
-void run_deferred(qjs::JSEngine& engine) {
+void run_deferred(qjs::Engine& engine) {
     if (Scheduler* s = active_scheduler()) {
         s->run_deferred(engine);
     }

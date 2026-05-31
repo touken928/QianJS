@@ -1,22 +1,21 @@
 #pragma once
 
-#include <js_engine.h>
+#include <qjs/promise.h>
 
-#include <cstddef>
 #include <unordered_set>
 #include <vector>
 
 namespace qianjs {
 
-/** Tracks native PromiseHandle ptrs until resolve/reject + release. */
+/** Tracks native promises until resolve/reject + release. */
 class PromiseRegistry {
 public:
-    void track(qjs::JSEngine::PromiseHandle h);
-    void untrack(qjs::JSEngine::PromiseHandle h);
-    void reject_all(qjs::JSEngine& engine, const char* message, const char* code = "ESHUTDOWN");
+    void track(qjs::Promise* p);
+    void untrack(qjs::Promise* p);
+    void reject_all(const char* message, const char* code = "ESHUTDOWN");
 
 private:
-    std::unordered_set<void*> pending_;
+    std::unordered_set<qjs::Promise*> pending_;
 };
 
 } // namespace qianjs

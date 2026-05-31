@@ -1,157 +1,13 @@
 #include "platform/platform_window.h"
 
+#include "platform/js_bridge.h"
+
 #include <cstdlib>
 
 #include <algorithm>
 #include <cmath>
 
 namespace qianjs::platform {
-
-namespace {
-
-const char* mouse_button_name(Uint8 b) {
-    switch (b) {
-    case SDL_BUTTON_LEFT:
-        return "left";
-    case SDL_BUTTON_MIDDLE:
-        return "middle";
-    case SDL_BUTTON_RIGHT:
-        return "right";
-    case SDL_BUTTON_X1:
-        return "x1";
-    case SDL_BUTTON_X2:
-        return "x2";
-    default:
-        return "unknown";
-    }
-}
-
-JSValue sdl_event_to_js(JSContext* c, const SDL_Event& e) {
-    JSValue o = JS_NewObject(c);
-    if (JS_IsException(o)) {
-        return o;
-    }
-
-    switch (e.type) {
-    case SDL_QUIT:
-        if (JS_SetPropertyStr(c, o, "type", JS_NewString(c, "quit")) < 0) {
-            goto fail;
-        }
-        return o;
-
-    case SDL_KEYDOWN:
-    case SDL_KEYUP: {
-        const char* t = e.type == SDL_KEYDOWN ? "keydown" : "keyup";
-        if (JS_SetPropertyStr(c, o, "type", JS_NewString(c, t)) < 0) {
-            goto fail;
-        }
-        if (JS_SetPropertyStr(c, o, "repeat", JS_NewBool(c, e.key.repeat != 0)) < 0) {
-            goto fail;
-        }
-        if (JS_SetPropertyStr(c, o, "scancode", JS_NewInt32(c, static_cast<int>(e.key.keysym.scancode))) < 0) {
-            goto fail;
-        }
-        if (JS_SetPropertyStr(c, o, "sym", JS_NewInt32(c, static_cast<int>(e.key.keysym.sym))) < 0) {
-            goto fail;
-        }
-        if (JS_SetPropertyStr(c, o, "mod", JS_NewInt32(c, static_cast<int>(e.key.keysym.mod))) < 0) {
-            goto fail;
-        }
-        {
-            const char* kn = SDL_GetKeyName(e.key.keysym.sym);
-            if (!kn) {
-                kn = "";
-            }
-            JSValue ks = JS_NewString(c, kn);
-            if (JS_IsException(ks)) {
-                JS_FreeValue(c, o);
-                return JS_EXCEPTION;
-            }
-            if (JS_SetPropertyStr(c, o, "key", ks) < 0) {
-                JS_FreeValue(c, ks);
-                goto fail;
-            }
-        }
-        return o;
-    }
-
-    case SDL_MOUSEMOTION:
-        if (JS_SetPropertyStr(c, o, "type", JS_NewString(c, "mousemove")) < 0) {
-            goto fail;
-        }
-        if (JS_SetPropertyStr(c, o, "x", JS_NewInt32(c, e.motion.x)) < 0) {
-            goto fail;
-        }
-        if (JS_SetPropertyStr(c, o, "y", JS_NewInt32(c, e.motion.y)) < 0) {
-            goto fail;
-        }
-        if (JS_SetPropertyStr(c, o, "dx", JS_NewInt32(c, e.motion.xrel)) < 0) {
-            goto fail;
-        }
-        if (JS_SetPropertyStr(c, o, "dy", JS_NewInt32(c, e.motion.yrel)) < 0) {
-            goto fail;
-        }
-        if (JS_SetPropertyStr(c, o, "which", JS_NewInt32(c, static_cast<int>(e.motion.which))) < 0) {
-            goto fail;
-        }
-        return o;
-
-    case SDL_MOUSEBUTTONDOWN:
-    case SDL_MOUSEBUTTONUP: {
-        const char* t = e.type == SDL_MOUSEBUTTONDOWN ? "mousedown" : "mouseup";
-        if (JS_SetPropertyStr(c, o, "type", JS_NewString(c, t)) < 0) {
-            goto fail;
-        }
-        if (JS_SetPropertyStr(c, o, "button", JS_NewString(c, mouse_button_name(e.button.button))) < 0) {
-            goto fail;
-        }
-        if (JS_SetPropertyStr(c, o, "buttonId", JS_NewInt32(c, static_cast<int>(e.button.button))) < 0) {
-            goto fail;
-        }
-        if (JS_SetPropertyStr(c, o, "x", JS_NewInt32(c, e.button.x)) < 0) {
-            goto fail;
-        }
-        if (JS_SetPropertyStr(c, o, "y", JS_NewInt32(c, e.button.y)) < 0) {
-            goto fail;
-        }
-        if (JS_SetPropertyStr(c, o, "clicks", JS_NewInt32(c, static_cast<int>(e.button.clicks))) < 0) {
-            goto fail;
-        }
-        if (JS_SetPropertyStr(c, o, "which", JS_NewInt32(c, static_cast<int>(e.button.which))) < 0) {
-            goto fail;
-        }
-        return o;
-    }
-
-    case SDL_MOUSEWHEEL:
-        if (JS_SetPropertyStr(c, o, "type", JS_NewString(c, "mousewheel")) < 0) {
-            goto fail;
-        }
-        if (JS_SetPropertyStr(c, o, "x", JS_NewInt32(c, e.wheel.x)) < 0) {
-            goto fail;
-        }
-        if (JS_SetPropertyStr(c, o, "y", JS_NewInt32(c, e.wheel.y)) < 0) {
-            goto fail;
-        }
-        if (JS_SetPropertyStr(c, o, "direction", JS_NewInt32(c, static_cast<int>(e.wheel.direction))) < 0) {
-            goto fail;
-        }
-        if (JS_SetPropertyStr(c, o, "which", JS_NewInt32(c, static_cast<int>(e.wheel.which))) < 0) {
-            goto fail;
-        }
-        return o;
-
-    default:
-        JS_FreeValue(c, o);
-        return JS_NULL;
-    }
-
-fail:
-    JS_FreeValue(c, o);
-    return JS_EXCEPTION;
-}
-
-} // namespace
 
 bool PlatformWindow::env_null_ui_enabled() {
     const char* v = std::getenv("QIANJS_NULL_UI");
@@ -265,127 +121,20 @@ bool PlatformWindow::batch_quit_or_escape(const std::vector<SDL_Event>& events) 
     return false;
 }
 
-JSValue PlatformWindow::events_to_js(JSContext* c, const std::vector<SDL_Event>& events) {
-    JSValue arr = JS_NewArray(c);
-    if (JS_IsException(arr)) {
-        return arr;
-    }
-
-    uint32_t idx = 0;
-    for (const SDL_Event& e : events) {
-        JSValue item = sdl_event_to_js(c, e);
-        if (JS_IsException(item)) {
-            JS_FreeValue(c, arr);
-            return JS_EXCEPTION;
-        }
-        if (JS_IsNull(item)) {
-            continue;
-        }
-        if (JS_SetPropertyUint32(c, arr, idx, item) < 0) {
-            JS_FreeValue(c, item);
-            JS_FreeValue(c, arr);
-            return JS_EXCEPTION;
-        }
-        ++idx;
-    }
-    return arr;
+qjs::Value PlatformWindow::events_to_js(qjs::Engine& engine, const std::vector<SDL_Event>& events) {
+    return events_to_value(engine, events);
 }
 
-JSValue PlatformWindow::mouse_state_js(JSContext* c) const {
-    int x = 0;
-    int y = 0;
-    Uint32 mask = 0;
-    if (!null_mode_) {
-        mask = SDL_GetMouseState(&x, &y);
-    }
-    JSValue o = JS_NewObject(c);
-    if (JS_IsException(o)) {
-        return JS_EXCEPTION;
-    }
-    if (JS_SetPropertyStr(c, o, "x", JS_NewInt32(c, x)) < 0) {
-        JS_FreeValue(c, o);
-        return JS_EXCEPTION;
-    }
-    if (JS_SetPropertyStr(c, o, "y", JS_NewInt32(c, y)) < 0) {
-        JS_FreeValue(c, o);
-        return JS_EXCEPTION;
-    }
-    JSValue b = JS_NewObject(c);
-    if (JS_IsException(b)) {
-        JS_FreeValue(c, o);
-        return JS_EXCEPTION;
-    }
-    const auto down = [mask](int btn) { return (mask & SDL_BUTTON(btn)) != 0; };
-    if (JS_SetPropertyStr(c, b, "left", JS_NewBool(c, down(SDL_BUTTON_LEFT))) < 0
-        || JS_SetPropertyStr(c, b, "middle", JS_NewBool(c, down(SDL_BUTTON_MIDDLE))) < 0
-        || JS_SetPropertyStr(c, b, "right", JS_NewBool(c, down(SDL_BUTTON_RIGHT))) < 0
-        || JS_SetPropertyStr(c, b, "x1", JS_NewBool(c, down(SDL_BUTTON_X1))) < 0
-        || JS_SetPropertyStr(c, b, "x2", JS_NewBool(c, down(SDL_BUTTON_X2))) < 0) {
-        JS_FreeValue(c, b);
-        JS_FreeValue(c, o);
-        return JS_EXCEPTION;
-    }
-    if (JS_SetPropertyStr(c, o, "buttons", b) < 0) {
-        JS_FreeValue(c, o);
-        return JS_EXCEPTION;
-    }
-    return o;
+qjs::Value PlatformWindow::mouse_state_js(qjs::Engine& engine) const {
+    return mouse_state_value(engine, null_mode_);
 }
 
-JSValue PlatformWindow::mod_state_js(JSContext* c) const {
-    const SDL_Keymod mod = null_mode_ ? static_cast<SDL_Keymod>(0) : SDL_GetModState();
-    JSValue o = JS_NewObject(c);
-    if (JS_IsException(o)) {
-        return JS_EXCEPTION;
-    }
-    const auto put = [&](const char* name, SDL_Keymod flag) -> bool {
-        return JS_SetPropertyStr(c, o, name, JS_NewBool(c, (mod & flag) != 0)) >= 0;
-    };
-    if (!put("shift", KMOD_SHIFT) || !put("ctrl", KMOD_CTRL) || !put("alt", KMOD_ALT) || !put("gui", KMOD_GUI)
-        || !put("num", KMOD_NUM) || !put("caps", KMOD_CAPS) || !put("lshift", KMOD_LSHIFT)
-        || !put("rshift", KMOD_RSHIFT) || !put("lctrl", KMOD_LCTRL) || !put("rctrl", KMOD_RCTRL)
-        || !put("lalt", KMOD_LALT) || !put("ralt", KMOD_RALT) || !put("lgui", KMOD_LGUI)
-        || !put("rgui", KMOD_RGUI)) {
-        JS_FreeValue(c, o);
-        return JS_EXCEPTION;
-    }
-    if (JS_SetPropertyStr(c, o, "raw", JS_NewInt32(c, static_cast<int>(mod))) < 0) {
-        JS_FreeValue(c, o);
-        return JS_EXCEPTION;
-    }
-    return o;
+qjs::Value PlatformWindow::mod_state_js(qjs::Engine& engine) const {
+    return mod_state_value(engine, null_mode_);
 }
 
-JSValue PlatformWindow::is_key_down_js(JSContext* c, JSValue key_arg) const {
-    SDL_Keycode key = SDLK_UNKNOWN;
-    if (JS_IsNumber(key_arg)) {
-        int32_t v = 0;
-        if (JS_ToInt32(c, &v, key_arg) != 0) {
-            return JS_EXCEPTION;
-        }
-        key = static_cast<SDL_Keycode>(v);
-    } else {
-        JSValue ts = JS_ToString(c, key_arg);
-        if (JS_IsException(ts)) {
-            return JS_EXCEPTION;
-        }
-        const char* p = JS_ToCString(c, ts);
-        JS_FreeValue(c, ts);
-        if (!p) {
-            return JS_EXCEPTION;
-        }
-        key = SDL_GetKeyFromName(p);
-        JS_FreeCString(c, p);
-    }
-    if (null_mode_) {
-        return JS_NewBool(c, false);
-    }
-    const SDL_Scancode sc = SDL_GetScancodeFromKey(key);
-    const Uint8* st = SDL_GetKeyboardState(nullptr);
-    if (sc == SDL_SCANCODE_UNKNOWN) {
-        return JS_NewBool(c, false);
-    }
-    return JS_NewBool(c, st[sc] != 0);
+qjs::Value PlatformWindow::is_key_down_js(qjs::Engine& engine, const qjs::Value& key_arg) const {
+    return is_key_down_value(engine, null_mode_, key_arg);
 }
 
 void PlatformWindow::clear_framebuffer(float r, float g, float b, float a) {

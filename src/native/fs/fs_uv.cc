@@ -35,7 +35,7 @@ static bool stat_is_dir(const uv_stat_t& st) {
 }
 
 struct FsReadCtx {
-    qjs::JSEngine::PromiseHandle ph{};
+    std::shared_ptr<qjs::Promise> ph{};
     std::string buffer;
     std::string fail_on_close;
     std::shared_ptr<uvw::file_req> req_keep;
@@ -43,7 +43,7 @@ struct FsReadCtx {
 };
 
 void defer_release_read_req(const std::shared_ptr<FsReadCtx>& ctx) {
-    qianjs::event_loop::defer([ctx](qjs::JSEngine&) { ctx->req_keep.reset(); });
+    qianjs::event_loop::defer([ctx](qjs::Engine&) { ctx->req_keep.reset(); });
 }
 
 void read_done_fail(const std::shared_ptr<FsReadCtx>& ctx, std::string msg) {
@@ -62,13 +62,13 @@ void read_resolve_ok(const std::shared_ptr<FsReadCtx>& ctx) {
 }
 
 struct FsWriteCtx {
-    qjs::JSEngine::PromiseHandle ph{};
+    std::shared_ptr<qjs::Promise> ph{};
     std::vector<uint8_t> data;
     std::shared_ptr<uvw::file_req> req_keep;
 };
 
 void defer_release_write_req(const std::shared_ptr<FsWriteCtx>& ctx) {
-    qianjs::event_loop::defer([ctx](qjs::JSEngine&) { ctx->req_keep.reset(); });
+    qianjs::event_loop::defer([ctx](qjs::Engine&) { ctx->req_keep.reset(); });
 }
 
 void write_done_fail(const std::shared_ptr<FsWriteCtx>& ctx, std::string msg) {
@@ -79,10 +79,11 @@ void write_done_fail(const std::shared_ptr<FsWriteCtx>& ctx, std::string msg) {
 
 } // namespace
 
-qjs::RawJSValue fsReadFileAsync(qjs::JSEngine& engine, std::string path, bool asBuffer) {
-    qjs::JSEngine::PromiseHandle ph = qianjs::promise::create(engine);
-    if (!ph.ptr)
-        return engine.promiseValue(ph);
+qjs::Value fsReadFileAsync(qjs::Engine& engine, std::string path, bool asBuffer) {
+    auto ph = qianjs::promise::create_shared(engine);
+    if (!ph) {
+        return {};
+    }
 
     auto ctx = std::make_shared<FsReadCtx>();
     ctx->ph = ph;
@@ -149,14 +150,15 @@ qjs::RawJSValue fsReadFileAsync(qjs::JSEngine& engine, std::string path, bool as
 
     qianjs::event_loop::begin_operation();
     req->open(path, openFlags, 0);
-    return engine.promiseValue(ph);
+    return ph->toValue();
 }
 
-static qjs::RawJSValue write_file_impl(qjs::JSEngine& engine, std::string path, std::vector<uint8_t> data, file_flags flags,
+static qjs::Value write_file_impl(qjs::Engine& engine, std::string path, std::vector<uint8_t> data, file_flags flags,
     int mode) {
-    qjs::JSEngine::PromiseHandle ph = qianjs::promise::create(engine);
-    if (!ph.ptr)
-        return engine.promiseValue(ph);
+    auto ph = qianjs::promise::create_shared(engine);
+    if (!ph) {
+        return {};
+    }
 
     auto ctx = std::make_shared<FsWriteCtx>();
     ctx->ph = ph;
@@ -200,10 +202,10 @@ static qjs::RawJSValue write_file_impl(qjs::JSEngine& engine, std::string path, 
 
     qianjs::event_loop::begin_operation();
     req->open(path, flags, mode);
-    return engine.promiseValue(ph);
+    return ph->toValue();
 }
 
-qjs::RawJSValue fsWriteFileAsync(qjs::JSEngine& engine, std::string path, std::vector<uint8_t> data) {
+qjs::Value fsWriteFileAsync(qjs::Engine& engine, std::string path, std::vector<uint8_t> data) {
     const file_flags flags = file_flags::WRONLY | file_flags::CREAT | file_flags::TRUNC;
 #ifdef _WIN32
     const int mode = _S_IREAD | _S_IWRITE;
@@ -213,24 +215,25 @@ qjs::RawJSValue fsWriteFileAsync(qjs::JSEngine& engine, std::string path, std::v
     return write_file_impl(engine, std::move(path), std::move(data), flags, mode);
 }
 
-qjs::RawJSValue fsMkdirAsync(qjs::JSEngine& engine, std::string path, bool recursive) {
-    qjs::JSEngine::PromiseHandle ph = qianjs::promise::create(engine);
-    if (!ph.ptr)
-        return engine.promiseValue(ph);
+qjs::Value fsMkdirAsync(qjs::Engine& engine, std::string path, bool recursive) {
+    auto ph = qianjs::promise::create_shared(engine);
+    if (!ph) {
+        return {};
+    }
 
     if (recursive) {
         std::error_code ec;
         std::filesystem::create_directories(std::filesystem::path(path), ec);
         if (ec) {
             reject(ph, ec.message());
-            return engine.promiseValue(ph);
+            return ph->toValue();
         }
         resolve_void(ph);
-        return engine.promiseValue(ph);
+        return ph->toValue();
     }
 
     struct MkdirAsyncCtx {
-        qjs::JSEngine::PromiseHandle ph{};
+        std::shared_ptr<qjs::Promise> ph{};
         std::shared_ptr<uvw::fs_req> req_keep;
     };
     auto ctx = std::make_shared<MkdirAsyncCtx>();
@@ -244,18 +247,18 @@ qjs::RawJSValue fsMkdirAsync(qjs::JSEngine& engine, std::string path, bool recur
     req->on<uvw::error_event>([ctx](const uvw::error_event& e, auto&) {
         qianjs::event_loop::end_operation();
         reject(ctx->ph, e.what());
-        qianjs::event_loop::defer([ctx](qjs::JSEngine&) { ctx->req_keep.reset(); });
+        qianjs::event_loop::defer([ctx](qjs::Engine&) { ctx->req_keep.reset(); });
     });
 
     req->on<uvw::fs_event>([ctx](const uvw::fs_event& ev, uvw::fs_req&) {
         if (ev.type == ft::MKDIR) {
             qianjs::event_loop::end_operation();
             resolve_void(ctx->ph);
-            qianjs::event_loop::defer([ctx](qjs::JSEngine&) { ctx->req_keep.reset(); });
+            qianjs::event_loop::defer([ctx](qjs::Engine&) { ctx->req_keep.reset(); });
         }
     });
 
     qianjs::event_loop::begin_operation();
     req->mkdir(path, 0777);
-    return engine.promiseValue(ph);
+    return ph->toValue();
 }

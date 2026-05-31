@@ -1,6 +1,6 @@
 #pragma once
 
-#include <quickjs.h>
+#include <qjs/value.h>
 
 namespace qianjs {
 
@@ -16,29 +16,29 @@ struct FrameLoopOptions {
 /** Holds JS app lifecycle callbacks (init / update / render / shutdown). */
 class AppHost {
 public:
-  AppHost() = default;
-  ~AppHost();
+    AppHost() = default;
+    ~AppHost();
 
-  AppHost(const AppHost&) = delete;
-  AppHost& operator=(const AppHost&) = delete;
+    AppHost(const AppHost&) = delete;
+    AppHost& operator=(const AppHost&) = delete;
 
-  bool load_from_object(JSContext* c, JSValue app_obj);
-  void release(JSContext* c);
+    bool load_from_object(qjs::Value app_obj);
+    void release();
 
-  bool has_hooks() const;
+    bool has_hooks() const;
 
-  JSValue init_fn() const { return init_; }
-  JSValue update_fn() const { return update_; }
-  JSValue render_fn() const { return render_; }
-  JSValue shutdown_fn() const { return shutdown_; }
+    const qjs::Value& init_fn() const { return init_; }
+    const qjs::Value& update_fn() const { return update_; }
+    const qjs::Value& render_fn() const { return render_; }
+    const qjs::Value& shutdown_fn() const { return shutdown_; }
 
 private:
-  static JSValue dup_fn(JSContext* c, JSValue obj, const char* key);
+    static qjs::Value take_fn(const qjs::Value& obj, const char* key);
 
-  JSValue init_ = JS_UNDEFINED;
-  JSValue update_ = JS_UNDEFINED;
-  JSValue render_ = JS_UNDEFINED;
-  JSValue shutdown_ = JS_UNDEFINED;
+    qjs::Value init_{};
+    qjs::Value update_{};
+    qjs::Value render_{};
+    qjs::Value shutdown_{};
 };
 
 } // namespace qianjs

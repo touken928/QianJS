@@ -2,8 +2,6 @@
 
 #include "runtime/instance.h"
 
-#include <quickjs.h>
-
 #include <atomic>
 #include <iostream>
 #include <utility>
@@ -21,7 +19,7 @@ struct Scheduler::TimerEntry {
     int64_t delay_ms = 0;
     bool repeat = false;
     bool cancelled = false;
-    JSValue callback = JS_UNDEFINED;
+    qjs::Value callback{};
 #if QIANJS_HAVE_LIBUV
     uv_timer_t uv{};
     bool uv_started = false;
@@ -70,7 +68,7 @@ void Scheduler::tick() {
 
 #endif // QIANJS_HAVE_LIBUV
 
-void Scheduler::defer(std::function<void(qjs::JSEngine&)> fn) {
+void Scheduler::defer(std::function<void(qjs::Engine&)> fn) {
     if (!phase_allows_js(phase_)) {
         return;
     }
@@ -78,7 +76,7 @@ void Scheduler::defer(std::function<void(qjs::JSEngine&)> fn) {
     RuntimeInstance* owner = owner_;
     std::lock_guard<std::mutex> lock(defer_mu_);
     defer_pending_.push_back(
-        [gen, owner, fn = std::move(fn)](qjs::JSEngine& e) mutable {
+        [gen, owner, fn = std::move(fn)](qjs::Engine& e) mutable {
             if (owner && owner->generation() != gen) {
                 return;
             }
@@ -86,11 +84,11 @@ void Scheduler::defer(std::function<void(qjs::JSEngine&)> fn) {
         });
 }
 
-void Scheduler::run_deferred(qjs::JSEngine& engine) {
+void Scheduler::run_deferred(qjs::Engine& engine) {
     if (!phase_allows_js(phase_)) {
         return;
     }
-    std::vector<std::function<void(qjs::JSEngine&)>> batch;
+    std::vector<std::function<void(qjs::Engine&)>> batch;
     {
         std::lock_guard<std::mutex> lock(defer_mu_);
         batch.swap(defer_pending_);
@@ -124,19 +122,6 @@ bool Scheduler::has_pending_deferred() const {
     return !defer_pending_.empty();
 }
 
-void Scheduler::free_timer_callback(qjs::JSEngine& engine, const std::shared_ptr<TimerEntry>& entry) {
-    if (!entry || JS_IsUndefined(entry->callback)) {
-        return;
-    }
-    JSContext* c = engine.ctx();
-    if (!c) {
-        entry->callback = JS_UNDEFINED;
-        return;
-    }
-    JS_FreeValue(c, entry->callback);
-    entry->callback = JS_UNDEFINED;
-}
-
 #if QIANJS_HAVE_LIBUV
 
 void Scheduler::stop_uv_timer(const std::shared_ptr<TimerEntry>& entry) {
@@ -167,37 +152,22 @@ void Scheduler::on_uv_timer(uv_timer_t* handle) {
     if (!shared_entry) {
         return;
     }
-    self->defer([self, shared_entry](qjs::JSEngine& e) { self->run_timer_callback(e, shared_entry); });
+    self->defer([self, shared_entry](qjs::Engine& e) { self->run_timer_callback(e, shared_entry); });
 }
 
 #endif
 
-void Scheduler::run_timer_callback(qjs::JSEngine& engine, const std::shared_ptr<TimerEntry>& entry) {
+void Scheduler::run_timer_callback(qjs::Engine& engine, const std::shared_ptr<TimerEntry>& entry) {
     if (!entry || entry->cancelled || !phase_allows_js(phase_)) {
         return;
     }
-    if (JS_IsUndefined(entry->callback)) {
+    if (!entry->callback.isFunction()) {
         return;
     }
 
-    JSContext* c = engine.ctx();
-    if (!c) {
-        return;
-    }
-
-    JSValue ret = JS_Call(c, entry->callback, JS_UNDEFINED, 0, nullptr);
-    if (JS_IsException(ret)) {
-        JSValue exc = JS_GetException(c);
-        const char* msg = JS_ToCString(c, exc);
-        if (msg) {
-            std::cerr << "timers callback exception: " << msg << '\n';
-            JS_FreeCString(c, msg);
-        } else {
-            std::cerr << "timers callback exception\n";
-        }
-        JS_FreeValue(c, exc);
-    } else {
-        JS_FreeValue(c, ret);
+    auto ret = engine.call(entry->callback);
+    if (!ret.success) {
+        std::cerr << "timers callback exception\n";
     }
 
     if (!entry->repeat) {
@@ -212,18 +182,17 @@ void Scheduler::run_timer_callback(qjs::JSEngine& engine, const std::shared_ptr<
                 timers_.erase(it);
             }
         }
-        free_timer_callback(engine, entry);
+        entry->callback = {};
         end_operation();
     }
 }
 
-bool Scheduler::add_timer(JSContext* c, JSValue callback, int64_t delay_ms, bool repeat, int64_t& out_id) {
+bool Scheduler::add_timer(qjs::Value callback, int64_t delay_ms, bool repeat, int64_t& out_id) {
     if (!phase_allows_new_async(phase_)) {
         return false;
     }
 
 #if !QIANJS_HAVE_LIBUV
-    (void)c;
     (void)callback;
     (void)delay_ms;
     (void)repeat;
@@ -244,12 +213,11 @@ bool Scheduler::add_timer(JSContext* c, JSValue callback, int64_t delay_ms, bool
     entry->id = next_timer_id_++;
     entry->delay_ms = delay_ms;
     entry->repeat = repeat;
-    entry->callback = JS_DupValue(c, callback);
+    entry->callback = std::move(callback);
 
     uv_loop_t* loop = raw_loop();
     if (uv_timer_init(loop, &entry->uv) != 0) {
-        JS_FreeValue(c, entry->callback);
-        entry->callback = JS_UNDEFINED;
+        entry->callback = {};
         return false;
     }
     entry->uv.data = entry.get();
@@ -257,8 +225,7 @@ bool Scheduler::add_timer(JSContext* c, JSValue callback, int64_t delay_ms, bool
     const uint64_t delay = static_cast<uint64_t>(delay_ms);
     const uint64_t repeat_ms = repeat ? static_cast<uint64_t>(delay_ms) : 0;
     if (uv_timer_start(&entry->uv, &Scheduler::on_uv_timer, delay, repeat_ms) != 0) {
-        JS_FreeValue(c, entry->callback);
-        entry->callback = JS_UNDEFINED;
+        entry->callback = {};
         return false;
     }
     entry->uv_started = true;
@@ -294,15 +261,10 @@ void Scheduler::cancel_timer(int64_t id) {
     stop_uv_timer(entry);
 #endif
     end_operation();
-    defer([entry](qjs::JSEngine& e) {
-        Scheduler* self = entry->owner;
-        if (self) {
-            self->free_timer_callback(e, entry);
-        }
-    });
+    defer([entry](qjs::Engine&) { entry->callback = {}; });
 }
 
-void Scheduler::shutdown(qjs::JSEngine& engine) {
+void Scheduler::shutdown(qjs::Engine& engine) {
     phase_ = LifecyclePhase::Shutdown;
 
     std::vector<std::shared_ptr<TimerEntry>> remaining;
@@ -323,7 +285,7 @@ void Scheduler::shutdown(qjs::JSEngine& engine) {
 #if QIANJS_HAVE_LIBUV
         stop_uv_timer(entry);
 #endif
-        free_timer_callback(engine, entry);
+        entry->callback = {};
     }
 
     {

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <js_engine.h>
+#include <qjs/engine.h>
 
 #include <functional>
 #include <memory>
@@ -43,9 +43,9 @@ void tick();
  * Queue work that must run on the JS thread (Promise settle, engine APIs).
  * Safe to call from libuv callbacks when enabled; runs on the next `run_deferred`.
  */
-void defer(std::function<void(qjs::JSEngine&)> fn);
+void defer(std::function<void(qjs::Engine&)> fn);
 
-void run_deferred(qjs::JSEngine& engine);
+void run_deferred(qjs::Engine& engine);
 
 /** Book-keeping for fs async ops so the host knows when the process can go idle. */
 void begin_operation();

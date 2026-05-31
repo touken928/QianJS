@@ -3,70 +3,78 @@
 #include "runtime/instance.h"
 #include "runtime/scheduler.h"
 
-#include <js_engine.h>
-#include <js_module.h>
+#include <qjs/call.h>
+#include <qjs/module.h>
 
 const char* TimersPlugin::name() const {
     return "timers";
 }
 
-void TimersPlugin::install(qjs::JSEngine& engine, qjs::JSModule& root) {
-    (void)engine;
+void TimersPlugin::install(qjs::Context& ctx, qjs::Module& root) {
+    (void)ctx;
     auto& m = root.module("timers");
 
-    m.funcDynamic("setTimeout", 2, 2, [](JSContext* c, int argc, JSValue* argv) -> JSValue {
-        (void)argc;
-        if (!JS_IsFunction(c, argv[0])) {
-            return JS_ThrowTypeError(c, "setTimeout: callback must be function");
+    m.funcDynamic("setTimeout", 2, 2, [](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
+        auto cb = ctx.valueArg(0);
+        if (!cb.success) {
+            return cb;
         }
-        int64_t delay = 0;
-        if (JS_ToInt64(c, &delay, argv[1]) < 0) {
-            return JS_EXCEPTION;
+        if (!cb.value.isFunction()) {
+            return qjs::Result<qjs::Value>::fail(qjs::ErrorInfo{"setTimeout: callback must be function", {}, {}});
         }
-
-        qianjs::RuntimeInstance* inst = qianjs::RuntimeInstance::current();
-        if (!inst) {
-            return JS_ThrowInternalError(c, "setTimeout: no active runtime instance");
-        }
-
-        int64_t id = 0;
-        if (!inst->scheduler().add_timer(c, argv[0], delay, false, id)) {
-            return JS_ThrowInternalError(c, "setTimeout: timer could not be scheduled");
-        }
-        return JS_NewInt64(c, id);
-    });
-
-    m.funcDynamic("setInterval", 2, 2, [](JSContext* c, int argc, JSValue* argv) -> JSValue {
-        (void)argc;
-        if (!JS_IsFunction(c, argv[0])) {
-            return JS_ThrowTypeError(c, "setInterval: callback must be function");
-        }
-        int64_t delay = 0;
-        if (JS_ToInt64(c, &delay, argv[1]) < 0) {
-            return JS_EXCEPTION;
+        auto delay = ctx.int64Arg(1);
+        if (!delay.success) {
+            return qjs::Result<qjs::Value>::fail(delay.error);
         }
 
         qianjs::RuntimeInstance* inst = qianjs::RuntimeInstance::current();
         if (!inst) {
-            return JS_ThrowInternalError(c, "setInterval: no active runtime instance");
+            return qjs::Result<qjs::Value>::fail(qjs::ErrorInfo{"setTimeout: no active runtime instance", {}, {}});
         }
 
         int64_t id = 0;
-        if (!inst->scheduler().add_timer(c, argv[0], delay, true, id)) {
-            return JS_ThrowInternalError(c, "setInterval: timer could not be scheduled");
+        if (!inst->scheduler().add_timer(std::move(cb.value), delay.value, false, id)) {
+            return qjs::Result<qjs::Value>::ok(
+                ctx.throwTypeError("setTimeout: timer could not be scheduled"));
         }
-        return JS_NewInt64(c, id);
+        return qjs::Result<qjs::Value>::ok(ctx.engine().int64(id));
     });
 
-    m.func("clearTimeout", [](int64_t id) {
+    m.funcDynamic("setInterval", 2, 2, [](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
+        auto cb = ctx.valueArg(0);
+        if (!cb.success) {
+            return cb;
+        }
+        if (!cb.value.isFunction()) {
+            return qjs::Result<qjs::Value>::fail(qjs::ErrorInfo{"setInterval: callback must be function", {}, {}});
+        }
+        auto delay = ctx.int64Arg(1);
+        if (!delay.success) {
+            return qjs::Result<qjs::Value>::fail(delay.error);
+        }
+
+        qianjs::RuntimeInstance* inst = qianjs::RuntimeInstance::current();
+        if (!inst) {
+            return qjs::Result<qjs::Value>::fail(qjs::ErrorInfo{"setInterval: no active runtime instance", {}, {}});
+        }
+
+        int64_t id = 0;
+        if (!inst->scheduler().add_timer(std::move(cb.value), delay.value, true, id)) {
+            return qjs::Result<qjs::Value>::ok(
+                ctx.throwTypeError("setInterval: timer could not be scheduled"));
+        }
+        return qjs::Result<qjs::Value>::ok(ctx.engine().int64(id));
+    });
+
+    m.func("clearTimeout", std::function<void(int64_t)>([](int64_t id) {
         if (qianjs::RuntimeInstance* inst = qianjs::RuntimeInstance::current()) {
             inst->scheduler().cancel_timer(id);
         }
-    });
+    }));
 
-    m.func("clearInterval", [](int64_t id) {
+    m.func("clearInterval", std::function<void(int64_t)>([](int64_t id) {
         if (qianjs::RuntimeInstance* inst = qianjs::RuntimeInstance::current()) {
             inst->scheduler().cancel_timer(id);
         }
-    });
+    }));
 }

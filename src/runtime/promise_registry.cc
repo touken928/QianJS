@@ -2,26 +2,26 @@
 
 namespace qianjs {
 
-void PromiseRegistry::track(qjs::JSEngine::PromiseHandle h) {
-    if (h.ptr) {
-        pending_.insert(h.ptr);
+void PromiseRegistry::track(qjs::Promise* p) {
+    if (p) {
+        pending_.insert(p);
     }
 }
 
-void PromiseRegistry::untrack(qjs::JSEngine::PromiseHandle h) {
-    if (h.ptr) {
-        pending_.erase(h.ptr);
+void PromiseRegistry::untrack(qjs::Promise* p) {
+    if (p) {
+        pending_.erase(p);
     }
 }
 
-void PromiseRegistry::reject_all(qjs::JSEngine& engine, const char* message, const char* code) {
-    const std::vector<void*> snapshot(pending_.begin(), pending_.end());
+void PromiseRegistry::reject_all(const char* message, const char* code) {
+    std::vector<qjs::Promise*> copy(pending_.begin(), pending_.end());
+    for (qjs::Promise* p : copy) {
+        if (p) {
+            p->reject(message, code ? code : "");
+        }
+    }
     pending_.clear();
-    for (void* ptr : snapshot) {
-        qjs::JSEngine::PromiseHandle h{ptr};
-        engine.rejectPromise(h, message, code);
-        engine.freePromise(h);
-    }
 }
 
 } // namespace qianjs

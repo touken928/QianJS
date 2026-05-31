@@ -1,6 +1,6 @@
 #pragma once
 
-#include <js_plugin.h>
+#include <qjs/plugin.h>
 #include <qianjs_default_plugins.g.h>
 
 inline qjs::PluginRegistry defaultPlugins() {

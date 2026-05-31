@@ -2,7 +2,8 @@
 
 #include "platform/draw_list.h"
 
-#include <quickjs.h>
+#include <qjs/engine.h>
+#include <qjs/value.h>
 
 #include <SDL.h>
 
@@ -30,11 +31,11 @@ public:
 
     void poll_events(std::vector<SDL_Event>& out) const;
     static bool batch_quit_or_escape(const std::vector<SDL_Event>& events);
-    static JSValue events_to_js(JSContext* c, const std::vector<SDL_Event>& events);
+    static qjs::Value events_to_js(qjs::Engine& engine, const std::vector<SDL_Event>& events);
 
-    JSValue mouse_state_js(JSContext* c) const;
-    JSValue mod_state_js(JSContext* c) const;
-    JSValue is_key_down_js(JSContext* c, JSValue key_arg) const;
+    qjs::Value mouse_state_js(qjs::Engine& engine) const;
+    qjs::Value mod_state_js(qjs::Engine& engine) const;
+    qjs::Value is_key_down_js(qjs::Engine& engine, const qjs::Value& key_arg) const;
 
     void clear_framebuffer(float r, float g, float b, float a);
     void set_color(float r, float g, float b, float a);

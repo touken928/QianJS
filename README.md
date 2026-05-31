@@ -129,7 +129,7 @@ add_executable(myapp main.cc)
 target_link_libraries(myapp PRIVATE qjs::qjs)
 ```
 
-公开 API 头文件位于 `third_party/qjs/include`，核心入口如 `#include <js_engine.h>`，命名空间为 `qjs::`。
+公开 API 头文件位于 `third_party/qjs/include/qjs/`，核心入口如 `#include <qjs/engine.h>`，命名空间为 `qjs::`。
 
 ---
 

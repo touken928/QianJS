@@ -3,7 +3,7 @@
 #include "native/default_plugins.h"
 #include "runtime/embed.h"
 
-#include <js_engine.h>
+#include <qjs/engine.h>
 
 #include <filesystem>
 #include <iostream>
@@ -24,26 +24,24 @@ int build_command(const fs::path& input_path) {
         return 1;
     }
 
-    qjs::JSEngine engine;
-    engine.initialize();
-    defaultPlugins().installAll(engine, engine.root());
-    qjs::JSEngine::CompileResult result = engine.compileModuleFromSource(code, input_path.string());
-    engine.cleanup();
+    qjs::Engine engine;
+    defaultPlugins().installAll(engine.context(), engine.modules());
+    qjs::CompileResult result = engine.compileModule(code, input_path.string());
     if (!result.success) {
-        std::cerr << "Compile error: " << result.error << std::endl;
+        std::cerr << "Compile error: " << result.error.message << std::endl;
         return 1;
     }
 
     fs::path output_path = fs::path("dist") / input_path.stem();
     output_path.replace_extension(".qbc");
 
-    if (!Embed::writeBinaryFile(output_path, result.bytecode)) {
+    if (!Embed::writeBinaryFile(output_path, result.value)) {
         std::cerr << "Error: Cannot write file: " << output_path << std::endl;
         return 1;
     }
 
     std::cout << "Compiled: " << input_path.string() << " -> " << output_path.string() << " ("
-              << result.bytecode.size() << " bytes)" << std::endl;
+              << result.value.size() << " bytes)" << std::endl;
     return 0;
 }
 
