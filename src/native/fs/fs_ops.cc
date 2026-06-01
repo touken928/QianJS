@@ -28,7 +28,7 @@ void schedule_resolve_string_array(std::shared_ptr<qjs::Promise> ph, std::vector
             }
             auto arr = engine.array();
             for (const auto& n : names) {
-                arr.pushString(n);
+                arr.push(n);
             }
             ph->resolve(arr.build());
             release(ph.get());

@@ -12,7 +12,7 @@
  * - Observability: QIANJS_BUILD_PROFILE and QIANJS_BUILD_MODULES in <qianjs_modules.h>.
  *
  * qjs boundary (see AGENTS.md):
- * - Native plugins use only opaque qjs APIs (CallContext, Value, Engine::call, ObjectBuilder).
+ * - Native plugins use only opaque qjs APIs (Module::func, Value, Engine::call, ObjectBuilder).
  * - Do not include quickjs.h or use JSContext/JSValue in src/native/ or src/runtime/ (platform
  *   SDL→JS helpers use Engine + js_bridge.cc).
  * - qjs does not implement libuv/SDL, argv/embed, or shutdown; QianJS owns those.

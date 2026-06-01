@@ -3,10 +3,11 @@
 #include "native/fs/fs_sync.h"
 #include "native/fs/fs_uv.h"
 
-#include <qjs/call.h>
 #include <qjs/engine.h>
 #include <qjs/module.h>
+#include <qjs/value.h>
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -15,75 +16,39 @@ const char* FsPlugin::name() const {
 }
 
 void FsPlugin::install(qjs::Context& ctx, qjs::Module& root) {
-    qjs::Engine* eng = &ctx.engine();
+    qjs::Engine& eng = ctx.engine();
     auto& m = root.module("fs");
 
-    auto one_path = [eng](auto fn) {
-        return [eng, fn](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
-            auto path = ctx.stringArg(0);
-            if (!path.success) {
-                return qjs::Result<qjs::Value>::fail(path.error);
-            }
-            return qjs::Result<qjs::Value>::ok(fn(*eng, std::move(path.value)));
-        };
+    auto one_path = [&eng](auto fn) {
+        return std::function<qjs::Value(std::string)>(
+            [&eng, fn](std::string path) -> qjs::Value { return fn(eng, std::move(path)); });
     };
 
-    m.funcDynamic("readFile", 1, 1, one_path([](qjs::Engine& e, std::string p) {
-        return fsReadFileAsync(e, std::move(p), false);
-    }));
+    m.func("readFile", one_path([](qjs::Engine& e, std::string p) { return fsReadFileAsync(e, std::move(p), false); }));
+    m.func("readFileBytes", one_path([](qjs::Engine& e, std::string p) { return fsReadFileAsync(e, std::move(p), true); }));
 
-    m.funcDynamic("readFileBytes", 1, 1, one_path([](qjs::Engine& e, std::string p) {
-        return fsReadFileAsync(e, std::move(p), true);
-    }));
-
-    m.funcDynamic("writeFile", 2, 2, [eng](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
-        auto path = ctx.stringArg(0);
-        if (!path.success) {
-            return qjs::Result<qjs::Value>::fail(path.error);
-        }
-        std::vector<uint8_t> data;
-        auto arg = ctx.valueArg(1);
-        if (!arg.success) {
-            return qjs::Result<qjs::Value>::fail(arg.error);
-        }
-        if (auto bytes = arg.value.toBytes(); bytes.success) {
-            data = std::move(bytes.value);
-        } else if (arg.value.isString()) {
-            auto asStr = arg.value.toString();
+    m.func("writeFile", std::function<qjs::Value(std::string, qjs::Value)>([&eng](std::string path, qjs::Value data) -> qjs::Value {
+        std::vector<uint8_t> bytes;
+        if (auto b = data.toBytes(); b.success) {
+            bytes = std::move(b.value);
+        } else if (data.isString()) {
+            auto asStr = data.toString();
             if (!asStr.success) {
-                return qjs::Result<qjs::Value>::fail(asStr.error);
+                return eng.throwTypeError("writeFile: invalid string data");
             }
-            data.assign(asStr.value.begin(), asStr.value.end());
+            bytes.assign(asStr.value.begin(), asStr.value.end());
         } else {
-            return qjs::Result<qjs::Value>::ok(ctx.throwTypeError(
-                "writeFile: data must be string, ArrayBuffer, or TypedArray"));
+            return eng.throwTypeError("writeFile: data must be string, ArrayBuffer, or TypedArray");
         }
-        return qjs::Result<qjs::Value>::ok(fsWriteFileAsync(*eng, std::move(path.value), std::move(data)));
-    });
-
-    m.funcDynamic("mkdir", 1, 1, one_path([](qjs::Engine& e, std::string p) {
-        return fsMkdirAsync(e, std::move(p), false);
+        return fsWriteFileAsync(eng, std::move(path), std::move(bytes));
     }));
 
-    m.funcDynamic("mkdirRecursive", 1, 1, one_path([](qjs::Engine& e, std::string p) {
-        return fsMkdirAsync(e, std::move(p), true);
-    }));
+    m.func("mkdir", one_path([](qjs::Engine& e, std::string p) { return fsMkdirAsync(e, std::move(p), false); }));
+    m.func("mkdirRecursive", one_path([](qjs::Engine& e, std::string p) { return fsMkdirAsync(e, std::move(p), true); }));
+    m.func("readdir", one_path([](qjs::Engine& e, std::string p) { return fsReaddirAsync(e, std::move(p)); }));
+    m.func("stat", one_path([](qjs::Engine& e, std::string p) { return fsStatAsync(e, std::move(p)); }));
+    m.func("unlink", one_path([](qjs::Engine& e, std::string p) { return fsUnlinkAsync(e, std::move(p)); }));
+    m.func("rmdir", one_path([](qjs::Engine& e, std::string p) { return fsRmdirAsync(e, std::move(p)); }));
 
-    m.funcDynamic("readdir", 1, 1, one_path([](qjs::Engine& e, std::string p) {
-        return fsReaddirAsync(e, std::move(p));
-    }));
-
-    m.funcDynamic("stat", 1, 1, one_path([](qjs::Engine& e, std::string p) {
-        return fsStatAsync(e, std::move(p));
-    }));
-
-    m.funcDynamic("unlink", 1, 1, one_path([](qjs::Engine& e, std::string p) {
-        return fsUnlinkAsync(e, std::move(p));
-    }));
-
-    m.funcDynamic("rmdir", 1, 1, one_path([](qjs::Engine& e, std::string p) {
-        return fsRmdirAsync(e, std::move(p));
-    }));
-
-    install_fs_sync(m.module("sync"));
+    install_fs_sync(eng, m.module("sync"));
 }

@@ -13,9 +13,9 @@ bool InputSystem::poll(platform::PlatformCanvas& canvas, std::vector<SDL_Event>&
 qjs::Value InputSystem::build_input_object(qjs::Engine& engine, platform::PlatformCanvas& canvas,
     const std::vector<SDL_Event>& batch, const InputFrame& frame) const {
     return engine.object()
-        .setInt64("frame", frame.frame)
-        .setDouble("dt", frame.dt)
-        .setDouble("alpha", frame.alpha)
+        .set("frame", frame.frame)
+        .set("dt", frame.dt)
+        .set("alpha", frame.alpha)
         .set("events", platform::PlatformCanvas::events_to_js(engine, batch, canvas.sdl_window_id()))
         .set("mouse", canvas.mouse_state_js(engine))
         .set("mods", canvas.mod_state_js(engine))

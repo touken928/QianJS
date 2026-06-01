@@ -3,15 +3,14 @@
 #include "runtime/instance.h"
 #include "runtime/runtime_context.h"
 
-#include <qjs/call.h>
 #include <qjs/engine.h>
 #include <qjs/module.h>
+#include <qjs/value.h>
 
 #include <filesystem>
 #include <functional>
+#include <optional>
 #include <string>
-#include <utility>
-#include <vector>
 
 #ifdef _WIN32
 #include <process.h>
@@ -63,66 +62,54 @@ const char* ProcessPlugin::name() const {
     return "process";
 }
 
-void ProcessPlugin::install(qjs::Context&, qjs::Module& root) {
+void ProcessPlugin::install(qjs::Context& ctx, qjs::Module& root) {
+    qjs::Engine& eng = ctx.engine();
     auto& m = root.module("process");
 
-    m.funcDynamic("pid", 0, 0, [](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
-        return qjs::Result<qjs::Value>::ok(ctx.engine().int64(current_pid()));
-    });
+    m.func("pid", std::function<int64_t()>([]() -> int64_t { return current_pid(); }));
+    m.func("platform", std::function<std::string()>([]() -> std::string { return platform_id(); }));
+    m.func("cwd", std::function<std::string()>([]() -> std::string { return current_working_directory(); }));
 
-    m.funcDynamic("platform", 0, 0, [](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
-        return qjs::Result<qjs::Value>::ok(ctx.engine().string(platform_id()));
-    });
-
-    m.funcDynamic("cwd", 0, 0, [](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
-        return qjs::Result<qjs::Value>::ok(ctx.engine().string(current_working_directory()));
-    });
-
-    m.funcDynamic("argv", 0, 0, [](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
+    m.func("argv", std::function<qjs::Value()>([&eng]() -> qjs::Value {
         qianjs::RuntimeContext* runtime = current_host();
-        auto arr = ctx.engine().array();
+        auto arr = eng.array();
         if (runtime) {
             for (const std::string& s : runtime->argv) {
-                arr.pushString(s);
+                arr.push(s);
             }
         }
-        return qjs::Result<qjs::Value>::ok(arr.build());
-    });
+        return arr.build();
+    }));
 
-    m.funcDynamic("env", 0, 1, [](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
+    m.func("env", std::function<qjs::Value(std::optional<std::string>)>([&eng](std::optional<std::string> key) -> qjs::Value {
         qianjs::RuntimeContext* runtime = current_host();
         if (!runtime) {
-            return qjs::Result<qjs::Value>::ok(ctx.undefined());
+            return eng.undefined();
         }
-        if (ctx.argc() == 0) {
-            auto obj = ctx.engine().object();
+        if (!key) {
+            auto obj = eng.object();
             for (const auto& kv : runtime->env) {
-                obj.setString(kv.first, kv.second);
+                obj.set(kv.first, kv.second);
             }
-            return qjs::Result<qjs::Value>::ok(obj.build());
-        }
-
-        auto key = ctx.stringArg(0);
-        if (!key.success) {
-            return qjs::Result<qjs::Value>::fail(key.error);
+            return obj.build();
         }
         for (const auto& kv : runtime->env) {
-            if (kv.first == key.value) {
-                return qjs::Result<qjs::Value>::ok(ctx.engine().string(kv.second));
+            if (kv.first == *key) {
+                return eng.string(kv.second);
             }
         }
-        return qjs::Result<qjs::Value>::ok(ctx.undefined());
-    });
+        return eng.undefined();
+    }));
 
-    m.func("getExitCode", []() -> int {
+    m.func("getExitCode", std::function<int()>([]() -> int {
         qianjs::RuntimeContext* runtime = current_host();
         return runtime ? runtime->exit_code : 0;
-    });
+    }));
 
-    m.func("exitCode", []() -> int {
+    m.func("exitCode", std::function<int()>([]() -> int {
         qianjs::RuntimeContext* runtime = current_host();
         return runtime ? runtime->exit_code : 0;
-    });
+    }));
 
     m.func("setExitCode", std::function<void(int)>([](int code) {
         if (qianjs::RuntimeContext* runtime = current_host()) {

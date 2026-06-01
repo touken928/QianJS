@@ -121,9 +121,9 @@ Generic QuickJS C++ bindings — **not** libuv/SDL/QianJS lifecycle. QianJS link
 |---------|------|
 | `<qjs/engine.h>` | `qjs::Engine` — eval/compile, value factories, `call`, promises |
 | `<qjs/context.h>` | `qjs::Context` — `modules()`, `engine()` |
-| `<qjs/module.h>` | `qjs::Module` — `func`, `value`, `funcDynamic(CallContext&)` |
-| `<qjs/call.h>` | `qjs::CallContext`, `NativeDynamicFunction` |
-| `<qjs/object.h>` | `ObjectBuilder`, `ArrayBuilder` |
+| `<qjs/module.h>` | `qjs::Module` — `func` (typed `std::function`), `value` |
+| `<qjs/call.h>` | `qjs::CallContext` (low-level; prefer typed `func`) |
+| `<qjs/object.h>` | `ObjectBuilder`, `ArrayBuilder` — `set`/`push` typed templates; `Context::object()` |
 | `<qjs/plugin.h>` | `qjs::IPlugin` |
 | `<qjs/promise.h>` | `qjs::Promise` — host tracks `Promise*` (e.g. `PromiseRegistry`) |
 | `<qjs/value.h>` | `qjs::Value` — opaque handle |

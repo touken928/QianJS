@@ -4,14 +4,15 @@
 
 #include "runtime/event_loop/event_loop.h"
 
-#include <qjs/call.h>
 #include <qjs/engine.h>
 #include <qjs/module.h>
+#include <qjs/value.h>
 
 #include <climits>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
@@ -22,182 +23,174 @@ namespace {
 
 namespace fs = std::filesystem;
 
-/** Single read via size preflight (avoids istream iterator byte-by-byte). */
 std::optional<std::vector<uint8_t>> read_entire_file_bin(const fs::path& path) {
     std::error_code ec;
     const auto sz_u = fs::file_size(path, ec);
-    if (ec)
+    if (ec) {
         return std::nullopt;
-    if (sz_u > static_cast<std::uintmax_t>(SIZE_MAX))
+    }
+    if (sz_u > static_cast<std::uintmax_t>(SIZE_MAX)) {
         return std::nullopt;
+    }
     const std::size_t sz = static_cast<std::size_t>(sz_u);
 
     std::vector<uint8_t> out(sz);
-    if (sz == 0)
+    if (sz == 0) {
         return out;
+    }
 
     std::ifstream in(path, std::ios::binary);
-    if (!in)
+    if (!in) {
         return std::nullopt;
+    }
     in.read(reinterpret_cast<char*>(out.data()), static_cast<std::streamsize>(sz));
-    if (!in || static_cast<std::size_t>(in.gcount()) != sz)
+    if (!in || static_cast<std::size_t>(in.gcount()) != sz) {
         return std::nullopt;
+    }
     return out;
 }
 
-qjs::Result<qjs::Value> fail_msg(std::string message) {
-    return qjs::Result<qjs::Value>::fail(qjs::ErrorInfo{std::move(message), {}, {}});
+qjs::Value fail(qjs::Engine& eng, std::string message) {
+    return eng.throwTypeError(message);
 }
 
-qjs::Result<qjs::Value> fail_ec(const char* prefix, const std::error_code& ec) {
+qjs::Value fail_ec(qjs::Engine& eng, const char* prefix, const std::error_code& ec) {
     std::string msg = prefix;
     msg += ec.message();
-    return fail_msg(std::move(msg));
+    return fail(eng, std::move(msg));
 }
-
-auto one_path = [](auto fn) {
-    return [fn](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
-        auto path = ctx.stringArg(0);
-        if (!path.success) {
-            return qjs::Result<qjs::Value>::fail(path.error);
-        }
-        return fn(ctx, std::move(path.value));
-    };
-};
 
 } // namespace
 
-void install_fs_sync(qjs::Module& sync) {
-    sync.funcDynamic("readFile", 1, 1, one_path([](qjs::CallContext& ctx, std::string pathStr) -> qjs::Result<qjs::Value> {
+void install_fs_sync(qjs::Engine& eng, qjs::Module& sync) {
+    sync.func("readFile", std::function<qjs::Value(std::string)>([&eng](std::string pathStr) -> qjs::Value {
         const fs::path path(pathStr);
         const auto bytes = read_entire_file_bin(path);
         if (!bytes) {
-            return fail_msg("readFile: cannot open or read file");
+            return fail(eng, "readFile: cannot open or read file");
         }
-        return qjs::Result<qjs::Value>::ok(
-            ctx.engine().string(std::string(reinterpret_cast<const char*>(bytes->data()), bytes->size())));
+        return eng.string(std::string(reinterpret_cast<const char*>(bytes->data()), bytes->size()));
     }));
 
-    sync.funcDynamic("readFileBytes", 1, 1, one_path([](qjs::CallContext& ctx, std::string pathStr) -> qjs::Result<qjs::Value> {
+    sync.func("readFileBytes", std::function<qjs::Value(std::string)>([&eng](std::string pathStr) -> qjs::Value {
         const fs::path path(pathStr);
         const auto bytes = read_entire_file_bin(path);
         if (!bytes) {
-            return fail_msg("readFileBytes: cannot open or read file");
+            return fail(eng, "readFileBytes: cannot open or read file");
         }
-        return qjs::Result<qjs::Value>::ok(ctx.engine().arrayBuffer(bytes->data(), bytes->size()));
+        return eng.arrayBuffer(bytes->data(), bytes->size());
     }));
 
-    sync.funcDynamic("writeFile", 2, 2, [](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
-        auto path = ctx.stringArg(0);
-        if (!path.success) {
-            return qjs::Result<qjs::Value>::fail(path.error);
-        }
-        auto bytes = ctx.bytesArg(1);
-        if (!bytes.success) {
-            auto asStr = ctx.stringArg(1);
+    sync.func("writeFile", std::function<qjs::Value(std::string, qjs::Value)>([&eng](std::string path, qjs::Value data) -> qjs::Value {
+        std::vector<uint8_t> bytes;
+        if (auto b = data.toBytes(); b.success) {
+            bytes = std::move(b.value);
+        } else if (data.isString()) {
+            auto asStr = data.toString();
             if (!asStr.success) {
-                return fail_msg("writeFile: data must be string, ArrayBuffer, or TypedArray");
+                return fail(eng, "writeFile: invalid string data");
             }
-            bytes.value.assign(asStr.value.begin(), asStr.value.end());
+            bytes.assign(asStr.value.begin(), asStr.value.end());
+        } else {
+            return fail(eng, "writeFile: data must be string, ArrayBuffer, or TypedArray");
         }
-        std::ofstream out(path.value, std::ios::binary | std::ios::trunc);
+        std::ofstream out(path, std::ios::binary | std::ios::trunc);
         if (!out) {
-            return fail_msg("writeFile: cannot open file for write");
+            return fail(eng, "writeFile: cannot open file for write");
         }
-        if (!bytes.value.empty()) {
-            out.write(reinterpret_cast<const char*>(bytes.value.data()),
-                static_cast<std::streamsize>(bytes.value.size()));
+        if (!bytes.empty()) {
+            out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
         }
         if (!out) {
-            return fail_msg("writeFile: write failed");
+            return fail(eng, "writeFile: write failed");
         }
-        return qjs::Result<qjs::Value>::ok(ctx.undefined());
-    });
+        return eng.undefined();
+    }));
 
-    sync.funcDynamic("mkdir", 1, 1, one_path([](qjs::CallContext& ctx, std::string pathStr) -> qjs::Result<qjs::Value> {
+    sync.func("mkdir", std::function<qjs::Value(std::string)>([&eng](std::string pathStr) -> qjs::Value {
         std::error_code ec;
         fs::create_directory(fs::path(pathStr), ec);
         if (ec) {
-            return fail_ec("mkdir: ", ec);
+            return fail_ec(eng, "mkdir: ", ec);
         }
-        return qjs::Result<qjs::Value>::ok(ctx.undefined());
+        return eng.undefined();
     }));
 
-    sync.funcDynamic("mkdirRecursive", 1, 1, one_path([](qjs::CallContext& ctx, std::string pathStr) -> qjs::Result<qjs::Value> {
+    sync.func("mkdirRecursive", std::function<qjs::Value(std::string)>([&eng](std::string pathStr) -> qjs::Value {
         std::error_code ec;
         fs::create_directories(fs::path(pathStr), ec);
         if (ec) {
-            return fail_ec("mkdirRecursive: ", ec);
+            return fail_ec(eng, "mkdirRecursive: ", ec);
         }
-        return qjs::Result<qjs::Value>::ok(ctx.undefined());
+        return eng.undefined();
     }));
 
-    sync.funcDynamic("readdir", 1, 1, one_path([](qjs::CallContext& ctx, std::string pathStr) -> qjs::Result<qjs::Value> {
+    sync.func("readdir", std::function<qjs::Value(std::string)>([&eng](std::string pathStr) -> qjs::Value {
         std::error_code ec;
         const fs::path p(pathStr);
         const fs::file_status st = fs::status(p, ec);
         if (ec) {
-            return fail_ec("readdir: ", ec);
+            return fail_ec(eng, "readdir: ", ec);
         }
         if (!fs::is_directory(st)) {
-            return fail_msg("readdir: not a directory");
+            return fail(eng, "readdir: not a directory");
         }
-        auto arr = ctx.engine().array();
+        auto arr = eng.array();
         for (const auto& ent : fs::directory_iterator(p, fs::directory_options::skip_permission_denied, ec)) {
             if (ec) {
-                return fail_ec("readdir: ", ec);
+                return fail_ec(eng, "readdir: ", ec);
             }
-            arr.pushString(ent.path().filename().string());
+            arr.push(ent.path().filename().string());
         }
-        return qjs::Result<qjs::Value>::ok(arr.build());
+        return arr.build();
     }));
 
-    sync.funcDynamic("stat", 1, 1, one_path([](qjs::CallContext& ctx, std::string path) -> qjs::Result<qjs::Value> {
+    sync.func("stat", std::function<qjs::Value(std::string)>([&eng](std::string path) -> qjs::Value {
         uv_fs_t req;
         uv_loop_t* lp = qianjs::event_loop::uv::loop();
         const int r = uv_fs_stat(lp, &req, path.c_str(), nullptr);
         if (r < 0) {
             std::string err = uv_strerror(r);
             uv_fs_req_cleanup(&req);
-            return fail_msg(err);
+            return fail(eng, err);
         }
-        qjs::Value o = fs_stat_to_value(ctx.engine(), req.statbuf);
+        qjs::Value o = fs_stat_to_value(eng, req.statbuf);
         uv_fs_req_cleanup(&req);
-        return qjs::Result<qjs::Value>::ok(std::move(o));
+        return o;
     }));
 
-    sync.funcDynamic("unlink", 1, 1, one_path([](qjs::CallContext& ctx, std::string pathStr) -> qjs::Result<qjs::Value> {
+    sync.func("unlink", std::function<qjs::Value(std::string)>([&eng](std::string pathStr) -> qjs::Value {
         const fs::path p(pathStr);
         std::error_code ec;
         const auto sl = fs::symlink_status(p, ec);
         if (ec) {
-            return fail_ec("unlink: ", ec);
+            return fail_ec(eng, "unlink: ", ec);
         }
         if (fs::is_directory(sl) && !fs::is_symlink(sl)) {
-            return fail_msg("unlink: path is a directory");
+            return fail(eng, "unlink: path is a directory");
         }
         if (!fs::remove(p, ec)) {
-            return fail_ec("unlink: ", ec);
+            return fail_ec(eng, "unlink: ", ec);
         }
-        return qjs::Result<qjs::Value>::ok(ctx.undefined());
+        return eng.undefined();
     }));
 
-    sync.funcDynamic("rmdir", 1, 1, one_path([](qjs::CallContext& ctx, std::string pathStr) -> qjs::Result<qjs::Value> {
+    sync.func("rmdir", std::function<qjs::Value(std::string)>([&eng](std::string pathStr) -> qjs::Value {
         const fs::path p(pathStr);
         std::error_code ec;
         const fs::file_status st = fs::status(p, ec);
         if (ec) {
-            return fail_ec("rmdir: ", ec);
+            return fail_ec(eng, "rmdir: ", ec);
         }
         if (!fs::is_directory(st)) {
-            return fail_msg("rmdir: not a directory");
+            return fail(eng, "rmdir: not a directory");
         }
         if (!fs::is_empty(p, ec)) {
-            return fail_ec("rmdir: ", ec);
+            return fail_ec(eng, "rmdir: ", ec);
         }
         if (!fs::remove(p, ec)) {
-            return fail_ec("rmdir: ", ec);
+            return fail_ec(eng, "rmdir: ", ec);
         }
-        return qjs::Result<qjs::Value>::ok(ctx.undefined());
+        return eng.undefined();
     }));
 }

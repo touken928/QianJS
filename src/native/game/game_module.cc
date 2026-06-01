@@ -6,32 +6,26 @@
 #include "runtime/app_host.h"
 #include "runtime/instance.h"
 
-#include <qjs/call.h>
 #include <qjs/engine.h>
 #include <qjs/module.h>
+#include <qjs/value.h>
 
+#include <functional>
+#include <optional>
 #include <string>
 
 namespace {
 
-bool parse_run_options(qjs::CallContext& ctx, int options_index, qianjs::FrameLoopOptions& opts,
-    std::string& title_storage) {
-    if (ctx.argc() <= options_index) {
+bool parse_run_options(const qjs::Value& opt_val, qianjs::FrameLoopOptions& opts, std::string& title_storage) {
+    if (opt_val.isUndefined()) {
         return true;
     }
-    auto optVal = ctx.valueArg(options_index);
-    if (!optVal.success) {
-        return false;
-    }
-    if (optVal.value.isUndefined()) {
-        return true;
-    }
-    if (!optVal.value.isObject()) {
+    if (!opt_val.isObject()) {
         return false;
     }
 
     auto read_opt_int = [&](const char* key, int* out) -> bool {
-        auto v = optVal.value.getProperty(key);
+        auto v = opt_val.getProperty(key);
         if (!v.success) {
             return false;
         }
@@ -47,7 +41,7 @@ bool parse_run_options(qjs::CallContext& ctx, int options_index, qianjs::FrameLo
     };
 
     auto read_opt_i64 = [&](const char* key, int64_t* out) -> bool {
-        auto v = optVal.value.getProperty(key);
+        auto v = opt_val.getProperty(key);
         if (!v.success) {
             return false;
         }
@@ -63,7 +57,7 @@ bool parse_run_options(qjs::CallContext& ctx, int options_index, qianjs::FrameLo
     };
 
     auto read_opt_double = [&](const char* key, double* out) -> bool {
-        auto v = optVal.value.getProperty(key);
+        auto v = opt_val.getProperty(key);
         if (!v.success) {
             return false;
         }
@@ -79,7 +73,7 @@ bool parse_run_options(qjs::CallContext& ctx, int options_index, qianjs::FrameLo
     };
 
     auto read_opt_string = [&](const char* key, std::string* out) -> bool {
-        auto v = optVal.value.getProperty(key);
+        auto v = opt_val.getProperty(key);
         if (!v.success) {
             return false;
         }
@@ -124,60 +118,52 @@ const char* GamePlugin::name() const {
     return "game";
 }
 
-void GamePlugin::install(qjs::Context&, qjs::Module& root) {
+void GamePlugin::install(qjs::Context& ctx, qjs::Module& root) {
+    qjs::Engine& eng = ctx.engine();
     auto& m = root.module("game");
 
-    m.funcDynamic("isKeyDown", 1, 1, [](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
-        auto key = ctx.valueArg(0);
-        if (!key.success) {
-            return qjs::Result<qjs::Value>::fail(key.error);
-        }
-        return qjs::Result<qjs::Value>::ok(qianjs::platform::is_key_down_value(
-            ctx.engine(), qianjs::platform::PlatformCanvas::env_null_ui_enabled(), key.value));
-    });
+    m.func("isKeyDown", std::function<qjs::Value(qjs::Value)>([&eng](qjs::Value key) -> qjs::Value {
+        return qianjs::platform::is_key_down_value(
+            eng, qianjs::platform::PlatformCanvas::env_null_ui_enabled(), key);
+    }));
 
-    m.funcDynamic("run", 2, 3, [](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
+    m.func("run",
+        std::function<qjs::Value(qjs::Value, qjs::Value, std::optional<qjs::Value>)>(
+            [&eng](qjs::Value canvasArg, qjs::Value appArg, std::optional<qjs::Value> options) -> qjs::Value {
         qianjs::RuntimeInstance* inst = qianjs::RuntimeInstance::current();
         if (!inst) {
-            return qjs::Result<qjs::Value>::fail(qjs::ErrorInfo{"game.run: no active runtime instance", {}, {}});
+            return eng.throwTypeError("game.run: no active runtime instance");
         }
 
         inst->clear_deferred_app();
 
-        auto canvasArg = ctx.valueArg(0);
-        auto appArg = ctx.valueArg(1);
-        if (!canvasArg.success || !appArg.success) {
-            return qjs::Result<qjs::Value>::fail(qjs::ErrorInfo{"game.run: expected (canvas, app)", {}, {}});
-        }
-        if (!appArg.value.isObject()) {
-            return qjs::Result<qjs::Value>::fail(
-                qjs::ErrorInfo{"game.run: app must be an object with update and render", {}, {}});
+        if (!appArg.isObject()) {
+            return eng.throwTypeError("game.run: app must be an object with update and render");
         }
 
-        qianjs::platform::PlatformCanvas* canvas = qianjs::canvas::require_canvas(ctx, canvasArg.value);
+        qianjs::platform::PlatformCanvas* canvas = qianjs::canvas::require_canvas(eng, canvasArg);
         if (!canvas) {
-            return qjs::Result<qjs::Value>::fail(qjs::ErrorInfo{"game.run: invalid canvas", {}, {}});
+            return eng.undefined();
         }
 
         qianjs::AppHost host;
-        if (!host.load_from_object(std::move(appArg.value))) {
-            return qjs::Result<qjs::Value>::fail(
-                qjs::ErrorInfo{"game.run: app must provide update and render functions", {}, {}});
+        if (!host.load_from_object(std::move(appArg))) {
+            return eng.throwTypeError("game.run: app must provide update and render functions");
         }
 
         qianjs::FrameLoopOptions opts;
         opts.width = canvas->width();
         opts.height = canvas->height();
         std::string title;
-        if (!parse_run_options(ctx, 2, opts, title)) {
+        if (options && !parse_run_options(*options, opts, title)) {
             host.release();
-            return qjs::Result<qjs::Value>::fail(qjs::ErrorInfo{"game.run: invalid options", {}, {}});
+            return eng.throwTypeError("game.run: invalid options");
         }
 
         if (!inst->run_frame_loop(*canvas, host, opts)) {
             host.release();
-            return qjs::Result<qjs::Value>::fail(qjs::ErrorInfo{"game.run: frame loop failed", {}, {}});
+            return eng.throwTypeError("game.run: frame loop failed");
         }
-        return qjs::Result<qjs::Value>::ok(ctx.undefined());
-    });
+        return eng.undefined();
+    }));
 }

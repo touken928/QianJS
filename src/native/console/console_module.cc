@@ -1,32 +1,29 @@
 #include "native/console/console_module.h"
 
-#include <qjs/call.h>
+#include <qjs/engine.h>
 #include <qjs/module.h>
+#include <qjs/value.h>
 
 #include <iostream>
 #include <string>
+#include <vector>
 
 namespace {
 
-qjs::Result<qjs::Value> write_line(std::ostream& os, qjs::CallContext& ctx) {
+void write_line(std::ostream& os, const std::vector<qjs::Value>& args) {
     std::string out;
-    out.reserve(static_cast<size_t>(ctx.argc()) * 8u);
-    for (int i = 0; i < ctx.argc(); i++) {
+    out.reserve(args.size() * 8u);
+    for (size_t i = 0; i < args.size(); i++) {
         if (i > 0) {
             out.push_back(' ');
         }
-        auto v = ctx.valueArg(i);
-        if (!v.success) {
-            return v;
-        }
-        auto s = v.value.toString();
+        auto s = args[i].toString();
         if (!s.success) {
-            return qjs::Result<qjs::Value>::fail(s.error);
+            continue;
         }
         out += s.value;
     }
     os << out << '\n';
-    return qjs::Result<qjs::Value>::ok(ctx.undefined());
 }
 
 } // namespace
@@ -37,20 +34,10 @@ const char* ConsolePlugin::name() const {
 
 void ConsolePlugin::install(qjs::Context&, qjs::Module& root) {
     auto& c = root.module("console");
-
-    c.funcDynamic("log", 0, 32, [](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
-        return write_line(std::cout, ctx);
-    });
-    c.funcDynamic("info", 0, 32, [](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
-        return write_line(std::cout, ctx);
-    });
-    c.funcDynamic("debug", 0, 32, [](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
-        return write_line(std::cout, ctx);
-    });
-    c.funcDynamic("warn", 0, 32, [](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
-        return write_line(std::cerr, ctx);
-    });
-    c.funcDynamic("error", 0, 32, [](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
-        return write_line(std::cerr, ctx);
-    });
+    auto log_fn = [](std::vector<qjs::Value> args) { write_line(std::cout, args); };
+    c.func("log", log_fn);
+    c.func("info", log_fn);
+    c.func("debug", log_fn);
+    c.func("warn", [](std::vector<qjs::Value> args) { write_line(std::cerr, args); });
+    c.func("error", [](std::vector<qjs::Value> args) { write_line(std::cerr, args); });
 }

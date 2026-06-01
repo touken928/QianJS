@@ -6,256 +6,194 @@
 #include "platform/platform_canvas.h"
 #include "runtime/instance.h"
 
-#include <qjs/call.h>
 #include <qjs/engine.h>
 #include <qjs/module.h>
 #include <qjs/object.h>
+#include <qjs/value.h>
 
-#include <cmath>
+#include <functional>
+#include <optional>
 #include <string>
+
+#include <SDL.h>
 
 namespace {
 
+using qianjs::canvas::canvas_by_id;
 using qianjs::canvas::parse_color;
-using qianjs::canvas::require_canvas;
-using qianjs::canvas::require_canvas_id;
-
-template <typename Fn>
-auto bind_canvas(uint64_t canvas_id, Fn fn) {
-    return [canvas_id, fn = std::move(fn)](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
-        auto* c = require_canvas_id(ctx, canvas_id);
-        if (!c) {
-            return qjs::Result<qjs::Value>::fail(qjs::ErrorInfo{"invalid canvas", {}, {}});
-        }
-        return fn(ctx, c);
-    };
-}
 
 qjs::Value build_2d_context(qjs::Engine& engine, uint64_t canvas_id) {
     qjs::ObjectBuilder b(engine);
-    b.setInt64("_canvasId", static_cast<int64_t>(canvas_id));
+    b.set("_canvasId", static_cast<int64_t>(canvas_id));
 
-    b.funcDynamic("clearRect", 4, 4,
-        bind_canvas(canvas_id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) -> qjs::Result<qjs::Value> {
-            auto x = ctx.float64Arg(0);
-            auto y = ctx.float64Arg(1);
-            auto w = ctx.float64Arg(2);
-            auto h = ctx.float64Arg(3);
-            if (!x.success || !y.success || !w.success || !h.success) {
-                return qjs::Result<qjs::Value>::fail(qjs::ErrorInfo{"clearRect: expected 4 numbers", {}, {}});
-            }
-            c->draw_list().clear_rect(static_cast<float>(x.value), static_cast<float>(y.value),
-                static_cast<float>(w.value), static_cast<float>(h.value), c->fill_style());
-            return qjs::Result<qjs::Value>::ok(ctx.undefined());
-        }));
-
-    b.funcDynamic("fillRect", 4, 4,
-        bind_canvas(canvas_id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) -> qjs::Result<qjs::Value> {
-            auto x = ctx.float64Arg(0);
-            auto y = ctx.float64Arg(1);
-            auto w = ctx.float64Arg(2);
-            auto h = ctx.float64Arg(3);
-            if (!x.success || !y.success || !w.success || !h.success) {
-                return qjs::Result<qjs::Value>::fail(qjs::ErrorInfo{"fillRect: expected 4 numbers", {}, {}});
-            }
-            c->draw_list().fill_rect(static_cast<float>(x.value), static_cast<float>(y.value),
-                static_cast<float>(w.value), static_cast<float>(h.value));
-            return qjs::Result<qjs::Value>::ok(ctx.undefined());
-        }));
-
-    b.funcDynamic("strokeRect", 4, 4,
-        bind_canvas(canvas_id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) -> qjs::Result<qjs::Value> {
-            auto x = ctx.float64Arg(0);
-            auto y = ctx.float64Arg(1);
-            auto w = ctx.float64Arg(2);
-            auto h = ctx.float64Arg(3);
-            if (!x.success || !y.success || !w.success || !h.success) {
-                return qjs::Result<qjs::Value>::fail(qjs::ErrorInfo{"strokeRect: expected 4 numbers", {}, {}});
-            }
-            c->draw_list().stroke_rect(static_cast<float>(x.value), static_cast<float>(y.value),
-                static_cast<float>(w.value), static_cast<float>(h.value));
-            return qjs::Result<qjs::Value>::ok(ctx.undefined());
-        }));
-
-    b.funcDynamic("beginPath", 0, 0, bind_canvas(canvas_id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) {
-        c->draw_list().begin_path();
-        return qjs::Result<qjs::Value>::ok(ctx.undefined());
+    b.func("clearRect", [canvas_id](double x, double y, double w, double h) {
+        if (qianjs::platform::PlatformCanvas* c = canvas_by_id(canvas_id)) {
+            c->draw_list().clear_rect(static_cast<float>(x), static_cast<float>(y), static_cast<float>(w),
+                static_cast<float>(h), c->fill_style());
+        }
+    });
+    b.func("fillRect", [canvas_id](double x, double y, double w, double h) {
+        if (qianjs::platform::PlatformCanvas* c = canvas_by_id(canvas_id)) {
+            c->draw_list().fill_rect(static_cast<float>(x), static_cast<float>(y), static_cast<float>(w),
+                static_cast<float>(h));
+        }
+    });
+    b.func("strokeRect", [canvas_id](double x, double y, double w, double h) {
+        if (qianjs::platform::PlatformCanvas* c = canvas_by_id(canvas_id)) {
+            c->draw_list().stroke_rect(static_cast<float>(x), static_cast<float>(y), static_cast<float>(w),
+                static_cast<float>(h));
+        }
+    });
+    b.func("beginPath", std::function<void()>([canvas_id]() {
+        if (qianjs::platform::PlatformCanvas* c = canvas_by_id(canvas_id)) {
+            c->draw_list().begin_path();
+        }
     }));
-
-    b.funcDynamic("moveTo", 2, 2,
-        bind_canvas(canvas_id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) -> qjs::Result<qjs::Value> {
-            auto x = ctx.float64Arg(0);
-            auto y = ctx.float64Arg(1);
-            if (!x.success || !y.success) {
-                return qjs::Result<qjs::Value>::fail(qjs::ErrorInfo{"moveTo: expected 2 numbers", {}, {}});
-            }
-            c->draw_list().move_to(static_cast<float>(x.value), static_cast<float>(y.value));
-            return qjs::Result<qjs::Value>::ok(ctx.undefined());
-        }));
-
-    b.funcDynamic("lineTo", 2, 2,
-        bind_canvas(canvas_id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) -> qjs::Result<qjs::Value> {
-            auto x = ctx.float64Arg(0);
-            auto y = ctx.float64Arg(1);
-            if (!x.success || !y.success) {
-                return qjs::Result<qjs::Value>::fail(qjs::ErrorInfo{"lineTo: expected 2 numbers", {}, {}});
-            }
-            c->draw_list().line_to(static_cast<float>(x.value), static_cast<float>(y.value));
-            return qjs::Result<qjs::Value>::ok(ctx.undefined());
-        }));
-
-    b.funcDynamic("closePath", 0, 0, bind_canvas(canvas_id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) {
-        c->draw_list().close_path();
-        return qjs::Result<qjs::Value>::ok(ctx.undefined());
+    b.func("moveTo", [canvas_id](double x, double y) {
+        if (qianjs::platform::PlatformCanvas* c = canvas_by_id(canvas_id)) {
+            c->draw_list().move_to(static_cast<float>(x), static_cast<float>(y));
+        }
+    });
+    b.func("lineTo", [canvas_id](double x, double y) {
+        if (qianjs::platform::PlatformCanvas* c = canvas_by_id(canvas_id)) {
+            c->draw_list().line_to(static_cast<float>(x), static_cast<float>(y));
+        }
+    });
+    b.func("closePath", std::function<void()>([canvas_id]() {
+        if (qianjs::platform::PlatformCanvas* c = canvas_by_id(canvas_id)) {
+            c->draw_list().close_path();
+        }
     }));
-
-    b.funcDynamic("fill", 0, 0, bind_canvas(canvas_id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) {
-        c->draw_list().fill();
-        return qjs::Result<qjs::Value>::ok(ctx.undefined());
+    b.func("fill", std::function<void()>([canvas_id]() {
+        if (qianjs::platform::PlatformCanvas* c = canvas_by_id(canvas_id)) {
+            c->draw_list().fill();
+        }
     }));
-
-    b.funcDynamic("stroke", 0, 0, bind_canvas(canvas_id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) {
-        c->draw_list().stroke();
-        return qjs::Result<qjs::Value>::ok(ctx.undefined());
+    b.func("stroke", std::function<void()>([canvas_id]() {
+        if (qianjs::platform::PlatformCanvas* c = canvas_by_id(canvas_id)) {
+            c->draw_list().stroke();
+        }
     }));
-
-    b.funcDynamic("save", 0, 0, bind_canvas(canvas_id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) {
-        c->draw_list().save();
-        return qjs::Result<qjs::Value>::ok(ctx.undefined());
+    b.func("save", std::function<void()>([canvas_id]() {
+        if (qianjs::platform::PlatformCanvas* c = canvas_by_id(canvas_id)) {
+            c->draw_list().save();
+        }
     }));
-
-    b.funcDynamic("restore", 0, 0, bind_canvas(canvas_id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) {
-        c->draw_list().restore();
-        return qjs::Result<qjs::Value>::ok(ctx.undefined());
+    b.func("restore", std::function<void()>([canvas_id]() {
+        if (qianjs::platform::PlatformCanvas* c = canvas_by_id(canvas_id)) {
+            c->draw_list().restore();
+        }
     }));
-
-    b.funcDynamic("translate", 2, 2,
-        bind_canvas(canvas_id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) -> qjs::Result<qjs::Value> {
-            auto x = ctx.float64Arg(0);
-            auto y = ctx.float64Arg(1);
-            if (!x.success || !y.success) {
-                return qjs::Result<qjs::Value>::fail(qjs::ErrorInfo{"translate: expected 2 numbers", {}, {}});
-            }
-            c->draw_list().translate(static_cast<float>(x.value), static_cast<float>(y.value));
-            return qjs::Result<qjs::Value>::ok(ctx.undefined());
-        }));
-
-    b.funcDynamic("rotate", 1, 1,
-        bind_canvas(canvas_id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) -> qjs::Result<qjs::Value> {
-            auto a = ctx.float64Arg(0);
-            if (!a.success) {
-                return qjs::Result<qjs::Value>::fail(a.error);
-            }
-            c->draw_list().rotate(static_cast<float>(a.value));
-            return qjs::Result<qjs::Value>::ok(ctx.undefined());
-        }));
-
-    b.funcDynamic("scale", 2, 2,
-        bind_canvas(canvas_id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) -> qjs::Result<qjs::Value> {
-            auto sx = ctx.float64Arg(0);
-            auto sy = ctx.float64Arg(1);
-            if (!sx.success || !sy.success) {
-                return qjs::Result<qjs::Value>::fail(qjs::ErrorInfo{"scale: expected 2 numbers", {}, {}});
-            }
-            c->draw_list().scale(static_cast<float>(sx.value), static_cast<float>(sy.value));
-            return qjs::Result<qjs::Value>::ok(ctx.undefined());
-        }));
-
-    b.funcDynamic("fillText", 3, 3,
-        bind_canvas(canvas_id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) -> qjs::Result<qjs::Value> {
-            auto text = ctx.stringArg(0);
-            auto x = ctx.float64Arg(1);
-            auto y = ctx.float64Arg(2);
-            if (!text.success || !x.success || !y.success) {
-                return qjs::Result<qjs::Value>::fail(qjs::ErrorInfo{"fillText: expected (text, x, y)", {}, {}});
-            }
-            c->draw_list().fill_text(static_cast<float>(x.value), static_cast<float>(y.value), text.value, c->font_size());
-            return qjs::Result<qjs::Value>::ok(ctx.undefined());
-        }));
-
-    b.funcDynamic("measureText", 1, 1,
-        bind_canvas(canvas_id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) -> qjs::Result<qjs::Value> {
-            auto text = ctx.stringArg(0);
-            if (!text.success) {
-                return qjs::Result<qjs::Value>::fail(text.error);
-            }
-            const float est = static_cast<float>(text.value.size()) * c->font_size() * 0.55f;
-            qjs::ObjectBuilder out(ctx.engine());
-            out.setDouble("width", est);
-            return qjs::Result<qjs::Value>::ok(out.build());
-        }));
-
-    b.funcDynamic("setFillStyle", 1, 1,
-        bind_canvas(canvas_id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) -> qjs::Result<qjs::Value> {
-            auto arg = ctx.valueArg(0);
-            if (!arg.success) {
-                return qjs::Result<qjs::Value>::fail(arg.error);
-            }
-            auto col = parse_color(arg.value);
-            if (!col.success) {
-                return qjs::Result<qjs::Value>::fail(col.error);
-            }
-            auto s = arg.value.toString();
-            std::string css = s.success ? std::move(s.value) : std::string{};
-            c->set_fill_style(col.value, css);
-            return qjs::Result<qjs::Value>::ok(ctx.undefined());
-        }));
-
-    b.funcDynamic("setStrokeStyle", 1, 1,
-        bind_canvas(canvas_id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) -> qjs::Result<qjs::Value> {
-            auto arg = ctx.valueArg(0);
-            if (!arg.success) {
-                return qjs::Result<qjs::Value>::fail(arg.error);
-            }
-            auto col = parse_color(arg.value);
-            if (!col.success) {
-                return qjs::Result<qjs::Value>::fail(col.error);
-            }
-            auto s = arg.value.toString();
-            std::string css = s.success ? std::move(s.value) : std::string{};
-            c->set_stroke_style(col.value, css);
-            return qjs::Result<qjs::Value>::ok(ctx.undefined());
-        }));
-
-    b.funcDynamic("getFillStyle", 0, 0, bind_canvas(canvas_id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) {
-        return qjs::Result<qjs::Value>::ok(ctx.engine().string(c->fill_style_css()));
+    b.func("translate", [canvas_id](double x, double y) {
+        if (qianjs::platform::PlatformCanvas* c = canvas_by_id(canvas_id)) {
+            c->draw_list().translate(static_cast<float>(x), static_cast<float>(y));
+        }
+    });
+    b.func("rotate", [canvas_id](double a) {
+        if (qianjs::platform::PlatformCanvas* c = canvas_by_id(canvas_id)) {
+            c->draw_list().rotate(static_cast<float>(a));
+        }
+    });
+    b.func("scale", [canvas_id](double sx, double sy) {
+        if (qianjs::platform::PlatformCanvas* c = canvas_by_id(canvas_id)) {
+            c->draw_list().scale(static_cast<float>(sx), static_cast<float>(sy));
+        }
+    });
+    b.func("fillText", [canvas_id](std::string text, double x, double y) {
+        if (qianjs::platform::PlatformCanvas* c = canvas_by_id(canvas_id)) {
+            c->draw_list().fill_text(static_cast<float>(x), static_cast<float>(y), text, c->font_size());
+        }
+    });
+    b.func("measureText", std::function<qjs::Value(std::string)>([&engine, canvas_id](std::string text) -> qjs::Value {
+        float font = 16.f;
+        if (qianjs::platform::PlatformCanvas* c = canvas_by_id(canvas_id)) {
+            font = c->font_size();
+        }
+        const float est = static_cast<float>(text.size()) * font * 0.55f;
+        return engine.object().set("width", est).build();
     }));
-
-    b.funcDynamic("getStrokeStyle", 0, 0, bind_canvas(canvas_id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) {
-        return qjs::Result<qjs::Value>::ok(ctx.engine().string(c->stroke_style_css()));
+    b.func("setFillStyle", std::function<void(qjs::Value)>([&engine, canvas_id](qjs::Value arg) {
+        qianjs::platform::PlatformCanvas* c = canvas_by_id(canvas_id);
+        if (!c) {
+            return;
+        }
+        auto col = parse_color(arg);
+        if (!col.success) {
+            (void)engine.throwTypeError(col.error.message);
+            return;
+        }
+        auto s = arg.toString();
+        std::string css = s.success ? std::move(s.value) : std::string{};
+        c->set_fill_style(col.value, css);
     }));
-
-    b.funcDynamic("setLineWidth", 1, 1,
-        bind_canvas(canvas_id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) -> qjs::Result<qjs::Value> {
-            auto w = ctx.float64Arg(0);
-            if (!w.success) {
-                return qjs::Result<qjs::Value>::fail(w.error);
-            }
-            c->set_line_width(static_cast<float>(w.value));
-            return qjs::Result<qjs::Value>::ok(ctx.undefined());
-        }));
-
-    b.funcDynamic("getLineWidth", 0, 0, bind_canvas(canvas_id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) {
-        return qjs::Result<qjs::Value>::ok(ctx.engine().float64(c->line_width()));
+    b.func("setStrokeStyle", std::function<void(qjs::Value)>([&engine, canvas_id](qjs::Value arg) {
+        qianjs::platform::PlatformCanvas* c = canvas_by_id(canvas_id);
+        if (!c) {
+            return;
+        }
+        auto col = parse_color(arg);
+        if (!col.success) {
+            (void)engine.throwTypeError(col.error.message);
+            return;
+        }
+        auto s = arg.toString();
+        std::string css = s.success ? std::move(s.value) : std::string{};
+        c->set_stroke_style(col.value, css);
     }));
-
-    b.funcDynamic("setFont", 1, 1,
-        bind_canvas(canvas_id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) -> qjs::Result<qjs::Value> {
-            auto s = ctx.stringArg(0);
-            if (!s.success) {
-                return qjs::Result<qjs::Value>::fail(s.error);
-            }
-            const size_t px = s.value.find("px");
+    b.func("getFillStyle", std::function<qjs::Value()>([&engine, canvas_id]() -> qjs::Value {
+        if (qianjs::platform::PlatformCanvas* c = canvas_by_id(canvas_id)) {
+            return engine.string(c->fill_style_css());
+        }
+        return engine.undefined();
+    }));
+    b.func("getStrokeStyle", std::function<qjs::Value()>([&engine, canvas_id]() -> qjs::Value {
+        if (qianjs::platform::PlatformCanvas* c = canvas_by_id(canvas_id)) {
+            return engine.string(c->stroke_style_css());
+        }
+        return engine.undefined();
+    }));
+    b.func("setLineWidth", [canvas_id](double w) {
+        if (qianjs::platform::PlatformCanvas* c = canvas_by_id(canvas_id)) {
+            c->set_line_width(static_cast<float>(w));
+        }
+    });
+    b.func("getLineWidth", std::function<qjs::Value()>([&engine, canvas_id]() -> qjs::Value {
+        if (qianjs::platform::PlatformCanvas* c = canvas_by_id(canvas_id)) {
+            return engine.float64(c->line_width());
+        }
+        return engine.undefined();
+    }));
+    b.func("setFont", [canvas_id](std::string s) {
+        if (qianjs::platform::PlatformCanvas* c = canvas_by_id(canvas_id)) {
+            const size_t px = s.find("px");
             if (px != std::string::npos) {
                 try {
-                    c->set_font_size(std::stof(s.value.substr(0, px)));
+                    c->set_font_size(std::stof(s.substr(0, px)));
                 } catch (...) {
                 }
             }
-            return qjs::Result<qjs::Value>::ok(ctx.undefined());
-        }));
+        }
+    });
 
     return b.build();
+}
+
+std::string title_from_options(const qjs::Value& opt) {
+    if (opt.isObject()) {
+        auto ts = opt.getProperty("title");
+        if (ts.success && !ts.value.isUndefined()) {
+            auto s = ts.value.toString();
+            if (s.success) {
+                return std::move(s.value);
+            }
+        }
+    } else {
+        auto s = opt.toString();
+        if (s.success) {
+            return std::move(s.value);
+        }
+    }
+    return "QianJS";
 }
 
 } // namespace
@@ -264,107 +202,77 @@ const char* CanvasPlugin::name() const {
     return "canvas";
 }
 
-void CanvasPlugin::install(qjs::Context&, qjs::Module& root) {
+void CanvasPlugin::install(qjs::Context& ctx, qjs::Module& root) {
+    qjs::Engine& eng = ctx.engine();
     auto& m = root.module("canvas");
 
-    m.funcDynamic("createCanvas", 2, 3, [](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
-        auto w = ctx.int32Arg(0);
-        auto h = ctx.int32Arg(1);
-        if (!w.success || !h.success) {
-            return qjs::Result<qjs::Value>::fail(qjs::ErrorInfo{"createCanvas: width and height required", {}, {}});
-        }
-        if (w.value <= 0 || h.value <= 0) {
-            return qjs::Result<qjs::Value>::fail(
-                qjs::ErrorInfo{"createCanvas: width and height must be positive", {}, {}});
+    m.func("createCanvas",
+        std::function<qjs::Value(int, int, std::optional<qjs::Value>)>([&eng](int w, int h,
+                                                                              std::optional<qjs::Value> options) -> qjs::Value {
+        if (w <= 0 || h <= 0) {
+            return eng.throwTypeError("createCanvas: width and height must be positive");
         }
         std::string title = "QianJS";
-        if (ctx.argc() >= 3) {
-            auto t = ctx.valueArg(2);
-            if (t.success && t.value.isObject()) {
-                auto ts = t.value.getProperty("title");
-                if (ts.success && !ts.value.isUndefined()) {
-                    auto s = ts.value.toString();
-                    if (s.success) {
-                        title = std::move(s.value);
-                    }
-                }
-            } else if (t.success) {
-                auto s = t.value.toString();
-                if (s.success) {
-                    title = std::move(s.value);
-                }
-            }
+        if (options) {
+            title = title_from_options(*options);
         }
 
         qianjs::RuntimeInstance* inst = qianjs::RuntimeInstance::current();
         if (!inst) {
-            return qjs::Result<qjs::Value>::fail(
-                qjs::ErrorInfo{"createCanvas: no active runtime instance", {}, {}});
+            return eng.throwTypeError("createCanvas: no active runtime instance");
         }
-        const uint64_t id = inst->canvases().create(w.value, h.value, title);
+        const uint64_t id = inst->canvases().create(w, h, title);
         if (id == 0) {
-            return qjs::Result<qjs::Value>::fail(qjs::ErrorInfo{"createCanvas: failed to create window", {}, {}});
+            return eng.throwTypeError("createCanvas: failed to create window");
         }
 
-        qjs::Engine& engine = ctx.engine();
-        auto canvas_obj = engine.object()
-                              .setInt64("width", w.value)
-                              .setInt64("height", h.value)
-                              .setInt64("_canvasId", static_cast<int64_t>(id))
-                              .funcDynamic("getContext", 1, 1,
-                                  [id](qjs::CallContext& c) -> qjs::Result<qjs::Value> {
-                                      auto type = c.stringArg(0);
-                                      if (!type.success) {
-                                          return qjs::Result<qjs::Value>::fail(type.error);
-                                      }
-                                      if (type.value != "2d") {
-                                          return qjs::Result<qjs::Value>::ok(c.undefined());
-                                      }
-                                      return qjs::Result<qjs::Value>::ok(build_2d_context(c.engine(), id));
-                                  })
-                              .funcDynamic("present", 0, 0,
-                                  bind_canvas(id, [](qjs::CallContext& ctx, qianjs::platform::PlatformCanvas* c) {
-                                      c->present();
-                                      return qjs::Result<qjs::Value>::ok(ctx.undefined());
-                                  }))
-                              .funcDynamic("pollEvents", 0, 0,
-                                  [id](qjs::CallContext& c) -> qjs::Result<qjs::Value> {
-                                      qianjs::RuntimeInstance* inst = qianjs::RuntimeInstance::current();
-                                      if (!inst) {
-                                          return qjs::Result<qjs::Value>::fail(
-                                              qjs::ErrorInfo{"pollEvents: no active runtime instance", {}, {}});
-                                      }
-                                      qianjs::platform::PlatformCanvas* canvas = qianjs::canvas::canvas_by_id(id);
-                                      if (!canvas || !canvas->inited()) {
-                                          return qjs::Result<qjs::Value>::fail(
-                                              qjs::ErrorInfo{"pollEvents: invalid canvas", {}, {}});
-                                      }
-                                      std::vector<SDL_Event> batch = inst->canvases().take_events(id);
-                                      const bool should_close = qianjs::platform::PlatformCanvas::batch_quit_or_escape(
-                                          batch, canvas->sdl_window_id());
-                                      qjs::ObjectBuilder out(c.engine());
-                                      out.set("events", qianjs::platform::PlatformCanvas::events_to_js(
-                                                              c.engine(), batch, canvas->sdl_window_id()));
-                                      out.setBool("shouldClose", should_close);
-                                      return qjs::Result<qjs::Value>::ok(out.build());
-                                  })
-                              .funcDynamic("close", 0, 0,
-                                  [id](qjs::CallContext& c) -> qjs::Result<qjs::Value> {
-                                      if (qianjs::RuntimeInstance* inst = qianjs::RuntimeInstance::current()) {
-                                          inst->canvases().destroy(id);
-                                      }
-                                      return qjs::Result<qjs::Value>::ok(c.undefined());
-                                  })
-                              .build();
-        return qjs::Result<qjs::Value>::ok(std::move(canvas_obj));
-    });
+        return eng.object()
+            .set("width", w)
+            .set("height", h)
+            .set("_canvasId", static_cast<int64_t>(id))
+            .func("getContext", std::function<qjs::Value(std::string)>([&eng, id](std::string type) -> qjs::Value {
+                if (type != "2d") {
+                    return eng.undefined();
+                }
+                return build_2d_context(eng, id);
+            }))
+            .func("present", std::function<void()>([id]() {
+                if (qianjs::platform::PlatformCanvas* c = canvas_by_id(id)) {
+                    c->present();
+                }
+            }))
+            .func("pollEvents", std::function<qjs::Value()>([&eng, id]() -> qjs::Value {
+                qianjs::RuntimeInstance* inst = qianjs::RuntimeInstance::current();
+                if (!inst) {
+                    return eng.throwTypeError("pollEvents: no active runtime instance");
+                }
+                qianjs::platform::PlatformCanvas* canvas = canvas_by_id(id);
+                if (!canvas || !canvas->inited()) {
+                    return eng.throwTypeError("pollEvents: invalid canvas");
+                }
+                std::vector<SDL_Event> batch = inst->canvases().take_events(id);
+                const bool should_close = qianjs::platform::PlatformCanvas::batch_quit_or_escape(
+                    batch, canvas->sdl_window_id());
+                return eng.object()
+                    .set("events",
+                        qianjs::platform::PlatformCanvas::events_to_js(eng, batch, canvas->sdl_window_id()))
+                    .set("shouldClose", should_close)
+                    .build();
+            }))
+            .func("close", std::function<void()>([id]() {
+                if (qianjs::RuntimeInstance* inst = qianjs::RuntimeInstance::current()) {
+                    inst->canvases().destroy(id);
+                }
+            }))
+            .build();
+    }));
 
-    m.funcDynamic("pumpEvents", 0, 0, [](qjs::CallContext& ctx) -> qjs::Result<qjs::Value> {
+    m.func("pumpEvents", std::function<qjs::Value()>([&eng]() -> qjs::Value {
         qianjs::RuntimeInstance* inst = qianjs::RuntimeInstance::current();
         if (!inst) {
-            return qjs::Result<qjs::Value>::fail(qjs::ErrorInfo{"pumpEvents: no active runtime instance", {}, {}});
+            return eng.throwTypeError("pumpEvents: no active runtime instance");
         }
         inst->canvases().pump_events();
-        return qjs::Result<qjs::Value>::ok(ctx.engine().object().setBool("quit", inst->canvases().quit_requested()).build());
-    });
+        return eng.object().set("quit", inst->canvases().quit_requested()).build();
+    }));
 }

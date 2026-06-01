@@ -28,7 +28,7 @@ const char* mouse_button_name(Uint8 b) {
 qjs::Value sdl_event_to_value(qjs::Engine& engine, const SDL_Event& e) {
     switch (e.type) {
     case SDL_QUIT:
-        return engine.object().setString("type", "quit").build();
+        return engine.object().set("type", "quit").build();
     case SDL_KEYDOWN:
     case SDL_KEYUP: {
         const char* t = e.type == SDL_KEYDOWN ? "keydown" : "keyup";
@@ -37,43 +37,43 @@ qjs::Value sdl_event_to_value(qjs::Engine& engine, const SDL_Event& e) {
             kn = "";
         }
         return engine.object()
-            .setString("type", t)
-            .setBool("repeat", e.key.repeat != 0)
-            .setInt64("scancode", static_cast<int64_t>(e.key.keysym.scancode))
-            .setInt64("sym", static_cast<int64_t>(e.key.keysym.sym))
-            .setInt64("mod", static_cast<int64_t>(e.key.keysym.mod))
-            .setString("key", kn)
+            .set("type", t)
+            .set("repeat", e.key.repeat != 0)
+            .set("scancode", static_cast<int64_t>(e.key.keysym.scancode))
+            .set("sym", static_cast<int64_t>(e.key.keysym.sym))
+            .set("mod", static_cast<int64_t>(e.key.keysym.mod))
+            .set("key", kn)
             .build();
     }
     case SDL_MOUSEMOTION:
         return engine.object()
-            .setString("type", "mousemove")
-            .setInt64("x", e.motion.x)
-            .setInt64("y", e.motion.y)
-            .setInt64("dx", e.motion.xrel)
-            .setInt64("dy", e.motion.yrel)
-            .setInt64("which", static_cast<int64_t>(e.motion.which))
+            .set("type", "mousemove")
+            .set("x", e.motion.x)
+            .set("y", e.motion.y)
+            .set("dx", e.motion.xrel)
+            .set("dy", e.motion.yrel)
+            .set("which", static_cast<int64_t>(e.motion.which))
             .build();
     case SDL_MOUSEBUTTONDOWN:
     case SDL_MOUSEBUTTONUP: {
         const char* t = e.type == SDL_MOUSEBUTTONDOWN ? "mousedown" : "mouseup";
         return engine.object()
-            .setString("type", t)
-            .setString("button", mouse_button_name(e.button.button))
-            .setInt64("buttonId", static_cast<int64_t>(e.button.button))
-            .setInt64("x", e.button.x)
-            .setInt64("y", e.button.y)
-            .setInt64("clicks", static_cast<int64_t>(e.button.clicks))
-            .setInt64("which", static_cast<int64_t>(e.button.which))
+            .set("type", t)
+            .set("button", mouse_button_name(e.button.button))
+            .set("buttonId", static_cast<int64_t>(e.button.button))
+            .set("x", e.button.x)
+            .set("y", e.button.y)
+            .set("clicks", static_cast<int64_t>(e.button.clicks))
+            .set("which", static_cast<int64_t>(e.button.which))
             .build();
     }
     case SDL_MOUSEWHEEL:
         return engine.object()
-            .setString("type", "mousewheel")
-            .setInt64("x", e.wheel.x)
-            .setInt64("y", e.wheel.y)
-            .setInt64("direction", static_cast<int64_t>(e.wheel.direction))
-            .setInt64("which", static_cast<int64_t>(e.wheel.which))
+            .set("type", "mousewheel")
+            .set("x", e.wheel.x)
+            .set("y", e.wheel.y)
+            .set("direction", static_cast<int64_t>(e.wheel.direction))
+            .set("which", static_cast<int64_t>(e.wheel.which))
             .build();
     default:
         return engine.nullValue();
@@ -122,34 +122,34 @@ qjs::Value mouse_state_value(qjs::Engine& engine, bool null_mode, SDL_Window* wi
     }
     const auto down = [mask](int btn) { return (mask & SDL_BUTTON(btn)) != 0; };
     qjs::Value buttons = engine.object()
-                            .setBool("left", down(SDL_BUTTON_LEFT))
-                            .setBool("middle", down(SDL_BUTTON_MIDDLE))
-                            .setBool("right", down(SDL_BUTTON_RIGHT))
-                            .setBool("x1", down(SDL_BUTTON_X1))
-                            .setBool("x2", down(SDL_BUTTON_X2))
+                            .set("left", down(SDL_BUTTON_LEFT))
+                            .set("middle", down(SDL_BUTTON_MIDDLE))
+                            .set("right", down(SDL_BUTTON_RIGHT))
+                            .set("x1", down(SDL_BUTTON_X1))
+                            .set("x2", down(SDL_BUTTON_X2))
                             .build();
-    return engine.object().setInt64("x", x).setInt64("y", y).set("buttons", std::move(buttons)).build();
+    return engine.object().set("x", x).set("y", y).set("buttons", std::move(buttons)).build();
 }
 
 qjs::Value mod_state_value(qjs::Engine& engine, bool null_mode) {
     const SDL_Keymod mod = null_mode ? static_cast<SDL_Keymod>(0) : SDL_GetModState();
     const auto f = [&](SDL_Keymod flag) { return (mod & flag) != 0; };
     return engine.object()
-        .setBool("shift", f(KMOD_SHIFT))
-        .setBool("ctrl", f(KMOD_CTRL))
-        .setBool("alt", f(KMOD_ALT))
-        .setBool("gui", f(KMOD_GUI))
-        .setBool("num", f(KMOD_NUM))
-        .setBool("caps", f(KMOD_CAPS))
-        .setBool("lshift", f(KMOD_LSHIFT))
-        .setBool("rshift", f(KMOD_RSHIFT))
-        .setBool("lctrl", f(KMOD_LCTRL))
-        .setBool("rctrl", f(KMOD_RCTRL))
-        .setBool("lalt", f(KMOD_LALT))
-        .setBool("ralt", f(KMOD_RALT))
-        .setBool("lgui", f(KMOD_LGUI))
-        .setBool("rgui", f(KMOD_RGUI))
-        .setInt64("raw", static_cast<int64_t>(mod))
+        .set("shift", f(KMOD_SHIFT))
+        .set("ctrl", f(KMOD_CTRL))
+        .set("alt", f(KMOD_ALT))
+        .set("gui", f(KMOD_GUI))
+        .set("num", f(KMOD_NUM))
+        .set("caps", f(KMOD_CAPS))
+        .set("lshift", f(KMOD_LSHIFT))
+        .set("rshift", f(KMOD_RSHIFT))
+        .set("lctrl", f(KMOD_LCTRL))
+        .set("rctrl", f(KMOD_RCTRL))
+        .set("lalt", f(KMOD_LALT))
+        .set("ralt", f(KMOD_RALT))
+        .set("lgui", f(KMOD_LGUI))
+        .set("rgui", f(KMOD_RGUI))
+        .set("raw", static_cast<int64_t>(mod))
         .build();
 }
 
