@@ -37,7 +37,7 @@ qianjs_cli_run (src/app/cli.cc)
 
 Native modules use `RuntimeInstance::current()` — **no** process-global `g_ui`, `g_timers`, or defer queue.
 
-Plugins implement `qjs::IPlugin::install(qjs::Context&, qjs::Module&)`; QianJS registers them with `engine.install<CanvasPlugin>()` (see generated `qianjs_default_plugins.g.cc`). Bulk registration via `PluginRegistry` remains available.
+Plugins implement `qjs::IPlugin::install(qjs::Context&, qjs::Module&)`; QianJS registers them with `engine.install<CanvasPlugin>()` (see generated `qianjs_default_plugins.g.cc`). Plugin lifetime is owned by `qjs::Engine`.
 
 ## Lifecycle
 
@@ -124,7 +124,7 @@ Generic QuickJS C++ bindings — **not** libuv/SDL/QianJS lifecycle. QianJS link
 | `<qjs/module.h>` | `qjs::Module` — `func`, `value`, `funcDynamic(CallContext&)` |
 | `<qjs/call.h>` | `qjs::CallContext`, `NativeDynamicFunction` |
 | `<qjs/object.h>` | `ObjectBuilder`, `ArrayBuilder` |
-| `<qjs/plugin.h>` | `qjs::IPlugin`, `qjs::PluginRegistry` |
+| `<qjs/plugin.h>` | `qjs::IPlugin` |
 | `<qjs/promise.h>` | `qjs::Promise` — host tracks `Promise*` (e.g. `PromiseRegistry`) |
 | `<qjs/value.h>` | `qjs::Value` — opaque handle |
 | `<qjs/qjs.h>` | Umbrella include |

@@ -52,4 +52,4 @@ installDefaultPlugins(engine);
 // or per-plugin: engine.install<ConsolePlugin>();
 ```
 
-Third-party embedders may build a custom `PluginRegistry` without all modules.
+Third-party embedders call `engine.install<MyPlugin>()` on their own `qjs::Engine` without linking all QianJS modules.
