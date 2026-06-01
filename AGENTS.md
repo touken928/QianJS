@@ -37,7 +37,7 @@ qianjs_cli_run (src/app/cli.cc)
 
 Native modules use `RuntimeInstance::current()` — **no** process-global `g_ui`, `g_timers`, or defer queue.
 
-Plugins implement `qjs::IPlugin::install(qjs::Context&, qjs::Module&)`; registration via `PluginRegistry::installAll(engine.context(), engine.modules())` (see generated `qianjs_default_plugins.g.cc`).
+Plugins implement `qjs::IPlugin::install(qjs::Context&, qjs::Module&)`; QianJS registers them with `engine.install<CanvasPlugin>()` (see generated `qianjs_default_plugins.g.cc`). Bulk registration via `PluginRegistry` remains available.
 
 ## Lifecycle
 
@@ -109,7 +109,7 @@ Headless: `QIANJS_NULL_UI=1` (record draw commands; `present` no-ops GL).
 
 ## Testing
 
-- `qianjs::test::TestRuntime` → `instance.initialize(defaultPlugins())` → `begin_script_execution()` → `run_module` (`engine.evalModule(...).success`) → `rt.drain()` → `run_until_idle()`.
+- `qianjs::test::TestRuntime` → `instance.initialize()` → `begin_script_execution()` → `run_module` (`engine.evalModule(...).success`) → `rt.drain()` → `run_until_idle()`.
 
 ## `third_party/qjs` (embedding layer)
 

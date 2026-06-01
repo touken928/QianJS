@@ -26,7 +26,7 @@ All registration lives in **[`native_modules.cmake`](native_modules.cmake)**:
 ### Generated glue (do not edit)
 
 - `qianjs_modules.h` — `QIANJS_MODULE_*`, `QIANJS_BUILD_PROFILE`, `QIANJS_BUILD_MODULES`
-- `qianjs_default_plugins.g.h` — declares `qianjs_populate_default_plugins()`
+- `qianjs_default_plugins.g.h` — declares `qianjs_install_default_plugins(qjs::Engine&)`
 - `qianjs_default_plugins.g.cc` — plugin registration in topological order (linked into `qianjs_impl`)
 
 ### Adding a module
@@ -47,7 +47,9 @@ See [`native_contract.h`](native_contract.h): script thread, `defer` for async, 
 ```cpp
 #include "native/default_plugins.h"
 // or #include <qianjs_default_plugins.g.h>
-auto reg = defaultPlugins();
+qjs::Engine engine;
+installDefaultPlugins(engine);
+// or per-plugin: engine.install<ConsolePlugin>();
 ```
 
 Third-party embedders may build a custom `PluginRegistry` without all modules.

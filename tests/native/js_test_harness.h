@@ -18,7 +18,7 @@ struct TestRuntime {
 
     TestRuntime(std::vector<std::string> argv,
                 std::vector<std::pair<std::string, std::string>> env = {}) {
-        instance.initialize(defaultPlugins());
+        instance.initialize();
         instance.host().argv = std::move(argv);
         instance.host().env = std::move(env);
         instance.begin_script_execution();

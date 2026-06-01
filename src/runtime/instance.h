@@ -41,7 +41,7 @@ public:
     RuntimeInstance(const RuntimeInstance&) = delete;
     RuntimeInstance& operator=(const RuntimeInstance&) = delete;
 
-    void initialize(const qjs::PluginRegistry& plugins);
+    void initialize();
     void shutdown();
 
     qjs::Engine& engine() { return engine_; }

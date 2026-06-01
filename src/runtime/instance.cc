@@ -1,5 +1,6 @@
 #include "runtime/instance.h"
 
+#include "native/default_plugins.h"
 #include "runtime/embed.h"
 #include "runtime/plugin_lifecycle.h"
 
@@ -57,13 +58,13 @@ RuntimeInstance* RuntimeInstance::current() {
     return current_;
 }
 
-void RuntimeInstance::initialize(const qjs::PluginRegistry& plugins) {
+void RuntimeInstance::initialize() {
     if (phase_ != LifecyclePhase::Created) {
         return;
     }
 
     engine_.setHost<RuntimeInstance>(this);
-    plugins.installAll(engine_.context(), engine_.modules());
+    installDefaultPlugins(engine_);
 
     scheduler_.set_phase(LifecyclePhase::Initialized);
     phase_ = LifecyclePhase::Initialized;

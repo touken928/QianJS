@@ -16,7 +16,7 @@ namespace qianjs {
 
 int Application::run_script(const std::filesystem::path& input_path, std::vector<std::string> argv) {
     RuntimeInstance instance;
-    instance.initialize(defaultPlugins());
+    instance.initialize();
 
     if (argv.empty()) {
         instance.host().argv.push_back(input_path.string());
@@ -69,7 +69,7 @@ int Application::run_embedded(std::vector<std::string> argv) {
     }
 
     RuntimeInstance instance;
-    instance.initialize(defaultPlugins());
+    instance.initialize();
     instance.host().argv = std::move(argv);
     instance.host().env = captureEnvironment();
 

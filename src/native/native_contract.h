@@ -4,7 +4,7 @@
  * Native module contract (all built-in plugins under src/native/).
  *
  * - Surface: one *Plugin class per module implementing qjs::IPlugin (install on Context).
- * - Registration: CMake catalog -> qianjs_populate_default_plugins() (topological order).
+ * - Registration: CMake catalog -> qianjs_install_default_plugins(engine) (topological order).
  * - Threading: install() and JS callbacks on the runtime script thread; async I/O uses
  *   qianjs::event_loop::defer() (see fs, timers).
  * - Dependencies: declared in native_modules.cmake (DEPS between modules, REQUIRES libuv/ui_stack).

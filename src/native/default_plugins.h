@@ -1,10 +1,8 @@
 #pragma once
 
-#include <qjs/plugin.h>
+#include <qjs/engine.h>
 #include <qianjs_default_plugins.g.h>
 
-inline qjs::PluginRegistry defaultPlugins() {
-    qjs::PluginRegistry r;
-    qianjs_populate_default_plugins(r);
-    return r;
+inline void installDefaultPlugins(qjs::Engine& engine) {
+    qianjs_install_default_plugins(engine);
 }

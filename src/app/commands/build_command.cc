@@ -25,7 +25,7 @@ int build_command(const fs::path& input_path) {
     }
 
     qjs::Engine engine;
-    defaultPlugins().installAll(engine.context(), engine.modules());
+    installDefaultPlugins(engine);
     qjs::CompileResult result = engine.compileModule(code, input_path.string());
     if (!result.success) {
         std::cerr << "Compile error: " << result.error.message << std::endl;
